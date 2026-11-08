@@ -64,7 +64,7 @@ export default function App() {
   return (
     <div className="min-h-dvh">
       <header className="sticky top-0 z-30 border-b border-line bg-bg/85 backdrop-blur-md xl:static xl:border-0 xl:bg-transparent xl:backdrop-blur-none">
-        <div className="mx-auto flex h-14 max-w-[1600px] items-center gap-3 px-4 xl:h-16">
+        <div className="flex h-14 w-full items-center gap-3 px-4 sm:px-6 xl:h-16">
           <div className="flex items-center gap-2">
             <span className="grid size-8 place-items-center rounded-xl bg-accent text-on-accent">
               <CheckCircle size={20} weight="fill" />
@@ -106,7 +106,7 @@ export default function App() {
         </div>
       </header>
 
-      <main className="mx-auto max-w-[1600px] px-4 pt-4 pb-[calc(96px+env(safe-area-inset-bottom))] sm:pt-6 sm:pb-12 xl:grid xl:grid-cols-[300px_minmax(0,1fr)_340px] xl:items-start xl:gap-6 xl:pt-2">
+      <main className="w-full px-4 sm:px-6 pt-4 pb-[calc(96px+env(safe-area-inset-bottom))] sm:pt-6 sm:pb-12 xl:grid xl:grid-cols-[300px_minmax(0,1fr)_340px] xl:items-start xl:gap-6 xl:pt-2">
         <aside className={`${pane("focus")} space-y-4`}>
           <h2 className="text-3xl font-semibold xl:hidden">Focus</h2>
           <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-1">

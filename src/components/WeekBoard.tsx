@@ -172,7 +172,7 @@ export function WeekBoard({
         {days.map((k) => (
           <DayColumn
             key={k}
-            className="w-[236px] shrink-0 snap-start"
+            className="min-w-[236px] flex-1 snap-start"
             day={k}
             today={today}
             items={itemsOf(k)}

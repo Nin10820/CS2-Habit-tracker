@@ -83,13 +83,30 @@ export default function App() {
   const todayItems = itemsForDay(data, today)
 
   const themeBtn = (
-    <button
-      onClick={() => setTheme(isDark ? "light" : "dark")}
-      aria-label={isDark ? "Switch to light theme" : "Switch to dark theme"}
-      className={`${iconBtn} bg-surface-2`}
-    >
-      {isDark ? <Sun size={20} /> : <Moon size={20} />}
-    </button>
+    // Quick light / dark switch. "Follow the system" stays in Settings.
+    <div role="radiogroup" aria-label="Theme" className="flex h-10 shrink-0 items-center gap-0.5 rounded-full bg-surface-2 p-1">
+      {(
+        [
+          ["light", "Light", Sun],
+          ["dark", "Dark", Moon],
+        ] as const
+      ).map(([value, label, Icon]) => {
+        const on = value === "dark" ? isDark : !isDark
+        return (
+          <button
+            key={value}
+            role="radio"
+            aria-checked={on}
+            aria-label={`${label} theme`}
+            title={`${label} theme`}
+            onClick={() => setTheme(value)}
+            className={`press grid size-8 place-items-center rounded-full transition-colors ${on ? "bg-surface text-ink shadow-card" : "text-ink-3"}`}
+          >
+            <Icon size={18} weight={on ? "fill" : "regular"} />
+          </button>
+        )
+      })}
+    </div>
   )
   const settingsBtn = (
     <button onClick={() => setSheet({ kind: "settings" })} aria-label="Settings" className={`${iconBtn} bg-surface-2`}>

@@ -1,0 +1,94 @@
+/*
+ * Habit Tracker — design tokens.
+ * Components never hard-code colours: use these (or the Tailwind names mapped in index.css).
+ * Dark values are written twice on purpose: once for "follow the system", once for the manual toggle.
+ */
+:root {
+  --font-title: "Bricolage Grotesque", system-ui, sans-serif;
+  --font-main: "Montserrat", system-ui, sans-serif;
+
+  --bg: #f5f5f2;
+  --surface: #ffffff;
+  --surface-2: #efefea;
+  --border: #e4e4de;
+  --text: #16181d;
+  --text-2: #4f5560;
+  --text-3: #7d838d;
+  --accent: #2f7d5b;
+  --accent-soft: #e2f0e8;
+  --on-accent: #ffffff;
+  --flame: #d9601f;
+  --danger: #c4321f;
+  --overlay: rgb(15 17 19 / 40%);
+  --shadow: 0 1px 2px rgb(22 24 29 / 5%), 0 4px 16px rgb(22 24 29 / 5%);
+
+  /* Habit colours */
+  --h-green: #2f9e6a;
+  --h-blue: #2f74d9;
+  --h-violet: #7a52d6;
+  --h-pink: #d0457f;
+  --h-orange: #e0682b;
+  --h-amber: #c99512;
+  --h-teal: #13959a;
+  --h-slate: #5f6b7a;
+
+  color-scheme: light;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0f1113;
+    --surface: #181b1f;
+    --surface-2: #22262b;
+    --border: #2c3137;
+    --text: #f1f2f4;
+    --text-2: #b1b7c0;
+    --text-3: #7f8691;
+    --accent: #5cc597;
+    --accent-soft: #1b3128;
+    --on-accent: #0b1a13;
+    --flame: #f2894c;
+    --danger: #f97066;
+    --overlay: rgb(0 0 0 / 60%);
+    --shadow: 0 1px 2px rgb(0 0 0 / 30%);
+
+    --h-green: #4cc58a;
+    --h-blue: #5b9bf0;
+    --h-violet: #a184ef;
+    --h-pink: #ec6fa3;
+    --h-orange: #f28c55;
+    --h-amber: #e3b43a;
+    --h-teal: #38bcc0;
+    --h-slate: #8d99a8;
+
+    color-scheme: dark;
+  }
+}
+
+:root[data-theme="dark"] {
+  --bg: #0f1113;
+  --surface: #181b1f;
+  --surface-2: #22262b;
+  --border: #2c3137;
+  --text: #f1f2f4;
+  --text-2: #b1b7c0;
+  --text-3: #7f8691;
+  --accent: #5cc597;
+  --accent-soft: #1b3128;
+  --on-accent: #0b1a13;
+  --flame: #f2894c;
+  --danger: #f97066;
+  --overlay: rgb(0 0 0 / 60%);
+  --shadow: 0 1px 2px rgb(0 0 0 / 30%);
+
+  --h-green: #4cc58a;
+  --h-blue: #5b9bf0;
+  --h-violet: #a184ef;
+  --h-pink: #ec6fa3;
+  --h-orange: #f28c55;
+  --h-amber: #e3b43a;
+  --h-teal: #38bcc0;
+  --h-slate: #8d99a8;
+
+  color-scheme: dark;
+}

@@ -1,8 +1,13 @@
 import { useCallback, useEffect, useState } from "react"
-import { addDays, todayKey, type DayKey } from "./date"
-import { HABIT_COLORS, emptyData, type AppData, type Habit, type HabitColor } from "./types"
+import { GROUPS } from "../config/groups"
+import { todayKey, type DayKey } from "./date"
+import type { AppData, Task } from "./types"
 
-const DATA_KEY = "habit-tracker:data"
+const DATA_KEY = "habit-tracker:v2"
+const dayRe = /^\d{4}-\d{2}-\d{2}$/
+const timeRe = /^\d{2}:\d{2}$/
+
+export const emptyData = (): AppData => ({ version: 2, startedAt: todayKey(), checks: {}, tasks: [] })
 
 function load(): AppData {
   try {
@@ -18,31 +23,35 @@ function load(): AppData {
 export function parseData(input: unknown): AppData {
   if (!input || typeof input !== "object") throw new Error("Not a habit tracker backup.")
   const obj = input as Record<string, unknown>
-  if (!Array.isArray(obj.habits)) throw new Error("Backup has no habits list.")
-  const dayRe = /^\d{4}-\d{2}-\d{2}$/
-  const habits: Habit[] = obj.habits.flatMap((h) => {
-    if (!h || typeof h !== "object") return []
-    const { id, name, color, createdAt } = h as Record<string, unknown>
-    if (typeof id !== "string" || typeof name !== "string") return []
+  if (obj.version !== 2) throw new Error("This backup is from an older version of the app.")
+
+  const checks: AppData["checks"] = {}
+  for (const [id, days] of Object.entries((obj.checks ?? {}) as Record<string, unknown>)) {
+    if (!days || typeof days !== "object") continue
+    checks[id] = {}
+    for (const d of Object.keys(days)) if (dayRe.test(d)) checks[id][d] = true
+  }
+
+  const groupIds = new Set(GROUPS.map((g) => g.id))
+  const tasks: Task[] = (Array.isArray(obj.tasks) ? obj.tasks : []).flatMap((t) => {
+    if (!t || typeof t !== "object") return []
+    const { id, day, name, time, minutes, group, done } = t as Record<string, unknown>
+    if (typeof id !== "string" || typeof name !== "string" || typeof day !== "string" || !dayRe.test(day)) return []
     return [
       {
         id,
+        day,
         name: name.slice(0, 60),
-        color: HABIT_COLORS.includes(color as HabitColor) ? (color as HabitColor) : "green",
-        createdAt: typeof createdAt === "string" && dayRe.test(createdAt) ? createdAt : todayKey(),
+        time: typeof time === "string" && timeRe.test(time) ? time : undefined,
+        minutes: typeof minutes === "number" && minutes > 0 ? Math.round(minutes) : undefined,
+        group: typeof group === "string" && groupIds.has(group) ? group : GROUPS[0].id,
+        done: done === true,
       },
     ]
   })
-  const checks: AppData["checks"] = {}
-  const rawChecks = (obj.checks ?? {}) as Record<string, unknown>
-  for (const h of habits) {
-    const days = rawChecks[h.id]
-    checks[h.id] = {}
-    if (days && typeof days === "object") {
-      for (const d of Object.keys(days)) if (dayRe.test(d)) checks[h.id][d] = true
-    }
-  }
-  return { version: 1, habits, checks }
+
+  const startedAt = typeof obj.startedAt === "string" && dayRe.test(obj.startedAt) ? obj.startedAt : todayKey()
+  return { version: 2, startedAt, checks, tasks }
 }
 
 const newId = () =>
@@ -50,7 +59,9 @@ const newId = () =>
     ? crypto.randomUUID()
     : Math.random().toString(36).slice(2) + Date.now().toString(36)
 
-export function useHabitStore() {
+export type TaskInput = Omit<Task, "id" | "done">
+
+export function useStore() {
   const [data, setData] = useState<AppData>(load)
 
   useEffect(() => {
@@ -61,78 +72,38 @@ export function useHabitStore() {
     }
   }, [data])
 
-  const addHabit = useCallback((name: string, color: HabitColor) => {
-    setData((d) => {
-      const h: Habit = { id: newId(), name, color, createdAt: todayKey() }
-      return { ...d, habits: [...d.habits, h], checks: { ...d.checks, [h.id]: {} } }
-    })
-  }, [])
-
-  const updateHabit = useCallback((id: string, patch: Partial<Pick<Habit, "name" | "color">>) => {
-    setData((d) => ({ ...d, habits: d.habits.map((h) => (h.id === id ? { ...h, ...patch } : h)) }))
-  }, [])
-
-  const deleteHabit = useCallback((id: string) => {
-    setData((d) => {
-      const checks = { ...d.checks }
-      delete checks[id]
-      return { ...d, habits: d.habits.filter((h) => h.id !== id), checks }
-    })
-  }, [])
-
-  const moveHabit = useCallback((id: string, dir: -1 | 1) => {
-    setData((d) => {
-      const i = d.habits.findIndex((h) => h.id === id)
-      const j = i + dir
-      if (i < 0 || j < 0 || j >= d.habits.length) return d
-      const habits = [...d.habits]
-      ;[habits[i], habits[j]] = [habits[j], habits[i]]
-      return { ...d, habits }
-    })
-  }, [])
-
-  const toggleCheck = useCallback((id: string, day: DayKey) => {
+  const toggleHabit = useCallback((id: string, day: DayKey) => {
     setData((d) => {
       const days = { ...(d.checks[id] ?? {}) }
       if (days[day]) delete days[day]
       else days[day] = true
-      // Checking a day before the habit existed moves its start back, so stats stay honest.
-      const habits = d.habits.map((h) => (h.id === id && day < h.createdAt ? { ...h, createdAt: day } : h))
-      return { ...d, habits, checks: { ...d.checks, [id]: days } }
+      // Ticking a day before first use moves the start back, so that day counts in stats.
+      return { ...d, startedAt: day < d.startedAt ? day : d.startedAt, checks: { ...d.checks, [id]: days } }
     })
+  }, [])
+
+  const addTask = useCallback((t: TaskInput) => {
+    setData((d) => ({ ...d, tasks: [...d.tasks, { ...t, id: newId(), done: false }] }))
+  }, [])
+
+  const updateTask = useCallback((id: string, patch: Partial<TaskInput>) => {
+    setData((d) => ({ ...d, tasks: d.tasks.map((t) => (t.id === id ? { ...t, ...patch } : t)) }))
+  }, [])
+
+  const toggleTask = useCallback((id: string) => {
+    setData((d) => ({ ...d, tasks: d.tasks.map((t) => (t.id === id ? { ...t, done: !t.done } : t)) }))
+  }, [])
+
+  const deleteTask = useCallback((id: string) => {
+    setData((d) => ({ ...d, tasks: d.tasks.filter((t) => t.id !== id) }))
   }, [])
 
   const replaceAll = useCallback((next: AppData) => setData(next), [])
 
-  return { data, addHabit, updateHabit, deleteHabit, moveHabit, toggleCheck, replaceAll }
+  return { data, toggleHabit, addTask, updateTask, toggleTask, deleteTask, replaceAll }
 }
 
-export type HabitStore = ReturnType<typeof useHabitStore>
-
-/** Example habits with ~6 weeks of history, so the dashboard can be tried without waiting. */
-export function sampleData(): AppData {
-  const today = todayKey()
-  const start = addDays(today, -44)
-  const defs: [string, HabitColor, number][] = [
-    ["Drink 2L of water", "blue", 0.85],
-    ["Read 20 pages", "violet", 0.6],
-    ["Walk 30 minutes", "green", 0.7],
-    ["No phone after 11pm", "orange", 0.45],
-  ]
-  let seed = 7
-  const rand = () => {
-    seed = (seed * 16807) % 2147483647
-    return seed / 2147483647
-  }
-  const data = emptyData()
-  for (const [name, color, p] of defs) {
-    const h: Habit = { id: newId(), name, color, createdAt: start }
-    data.habits.push(h)
-    data.checks[h.id] = {}
-    for (let k = start; k < today; k = addDays(k, 1)) if (rand() < p) data.checks[h.id][k] = true
-  }
-  return data
-}
+export type Store = ReturnType<typeof useStore>
 
 export function exportData(data: AppData) {
   const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" })

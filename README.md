@@ -1,15 +1,29 @@
 # Habit Tracker — v0.1
 
-A small daily habit tracker by Pham Nguyen Studio. Early v0.1, runs locally; not deployed yet.
+A personal habit and task dashboard by Pham Nguyen Studio. Early v0.1, runs locally; not deployed yet.
 
-## Features
+## Layout
 
-- Add, edit, reorder and delete habits (name + colour)
-- **Today**: tick habits off; the 7-day strip lets you fix the last week
-- Streaks: current and best per habit
-- **Progress** (on Today, beside the list on wide screens): this week / this month completion, longest current streak, 30-day bar chart, per-habit breakdown
-- Data lives in `localStorage` on the device: no login, no server. Export and import a JSON backup from the **Habits** tab
-- Light, dark or follow the system; works from 375px phones up
+From 1280px wide it's three columns. Narrower screens show the same three parts as tabs (Tasks · Focus · Progress).
+
+- **Focus** (left): quick timer (focus / break, with a chime when it ends) and one card per group ("big task") with today's checklist.
+- **My tasks** (middle): the whole week, Monday–Sunday. Each day lists that day's habits and one-off tasks as cards, sorted by time.
+  Prev/next week, **Today**, and **Filter** by group. On phones a week strip picks one day.
+- **Your progress** (right): daily goal, tasks completed per day this week, completion-rate line, tasks done this week, streak
+  (days in a row with every habit done).
+
+## Groups and habits are set in code
+
+Edit [`src/config/groups.ts`](src/config/groups.ts): groups, the habits in each (name, time, duration, which weekdays),
+`DAILY_GOAL`, and the timer lengths. The habits in there now are placeholders.
+Keep habit `id`s stable once you've used them: check-ins are saved by id.
+
+In the app, **Add task** adds a one-off task to a single day (tap its card to edit or delete).
+
+## Data
+
+Saved in `localStorage` on this device: no login, no server. Settings (gear icon) has theme, export/import JSON backup,
+and clear all. Habits only count in stats from the first day you used the app.
 
 ## Run
 
@@ -21,9 +35,7 @@ pnpm build    # type-check + production build into dist/
 
 ## Structure
 
-- `src/lib/` — dates (local `YYYY-MM-DD` keys), store (localStorage + backup), streak/completion maths, theme
-- `src/screens/` — Today, StatsPanel (shown on Today), Habits
-- `src/components/` — sheet/dialog, habit editor, small UI pieces
-- `src/styles/tokens.css` — all colours (light + dark). Fonts: Bricolage Grotesque (headings), Montserrat (UI)
-
-A day counts toward stats from the day a habit was created. Ticking an earlier day moves the start date back.
+- `src/config/groups.ts`: groups, habits, goal, timer lengths
+- `src/lib/`: dates (local `YYYY-MM-DD` keys), store (localStorage + backup), day items and stats, theme
+- `src/components/`: `WeekBoard` / `DayColumn` (middle), `Timer` + `GroupCard` (left), `ProgressPanel` (right), sheets
+- `src/styles/tokens.css`: all colours (light + dark). Fonts: Bricolage Grotesque (headings), Montserrat (UI)

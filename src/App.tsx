@@ -1,19 +1,25 @@
-import { ListChecks, Moon, Sun, CheckCircle } from "@phosphor-icons/react"
+import { ChartBar, CheckCircle, GearSix, Kanban, Moon, Sun, Timer as TimerIcon } from "@phosphor-icons/react"
 import { useEffect, useState, type ComponentType } from "react"
-import { HabitSheet } from "./components/HabitSheet"
-import { todayKey } from "./lib/date"
-import { sampleData, useHabitStore } from "./lib/store"
+import { GroupCard } from "./components/GroupCard"
+import { ProgressPanel } from "./components/ProgressPanel"
+import { SettingsSheet } from "./components/SettingsSheet"
+import { TaskSheet } from "./components/TaskSheet"
+import { QuickTimer } from "./components/Timer"
+import { WeekBoard } from "./components/WeekBoard"
+import { GROUPS } from "./config/groups"
+import { todayKey, type DayKey } from "./lib/date"
+import { itemsForDay } from "./lib/stats"
+import { useStore } from "./lib/store"
 import { useTheme } from "./lib/theme"
-import type { Habit } from "./lib/types"
-import { HabitsScreen } from "./screens/HabitsScreen"
-import { StatsPanel } from "./screens/StatsPanel"
-import { TodayScreen } from "./screens/TodayScreen"
+import type { DayItem, Task } from "./lib/types"
 
-type Tab = "today" | "habits"
+/** Below 1280px the three columns become tabs. */
+type Tab = "tasks" | "focus" | "progress"
 type IconT = ComponentType<{ size?: number; weight?: "regular" | "fill" | "bold" }>
 const TABS: [Tab, string, IconT][] = [
-  ["today", "Today", CheckCircle],
-  ["habits", "Habits", ListChecks],
+  ["tasks", "Tasks", Kanban],
+  ["focus", "Focus", TimerIcon],
+  ["progress", "Progress", ChartBar],
 ]
 
 /** Today's key, refreshed when the tab regains focus or the clock passes midnight. */
@@ -31,28 +37,34 @@ function useToday() {
   return today
 }
 
+type SheetState = { kind: "add"; day: DayKey } | { kind: "edit"; task: Task } | { kind: "settings" } | null
+
 export default function App() {
-  const store = useHabitStore()
+  const store = useStore()
+  const { data } = store
   const today = useToday()
   const [theme, setTheme, isDark] = useTheme()
-  const [tab, setTab] = useState<Tab>("today")
-  const [sheet, setSheet] = useState<{ habit?: Habit } | null>(null)
+  const [tab, setTab] = useState<Tab>("tasks")
+  const [sheet, setSheet] = useState<SheetState>(null)
 
   useEffect(() => {
     window.scrollTo(0, 0)
   }, [tab])
 
-  // Today with habits is a two-column dashboard on wide screens; everything else stays a narrow column.
-  const wide = tab === "today" && store.data.habits.length > 0
-  const width = wide ? "max-w-2xl lg:max-w-5xl" : "max-w-2xl"
+  const toggle = (item: DayItem, day: DayKey) => (item.kind === "habit" ? store.toggleHabit(item.id, day) : store.toggleTask(item.id))
+  const edit = (item: DayItem) => {
+    const task = item.kind === "task" && data.tasks.find((t) => t.id === item.id)
+    if (task) setSheet({ kind: "edit", task })
+  }
+  const todayItems = itemsForDay(data, today)
 
-  const openAdd = () => setSheet({})
-  const openEdit = (habit: Habit) => setSheet({ habit })
+  // Visible on its own tab below 1280px; always visible as a column from 1280px.
+  const pane = (t: Tab) => `${tab === t ? "" : "hidden"} xl:block`
 
   return (
     <div className="min-h-dvh">
-      <header className="sticky top-0 z-30 border-b border-line bg-bg/85 backdrop-blur-md">
-        <div className={`mx-auto flex h-14 ${width} items-center gap-3 px-4`}>
+      <header className="sticky top-0 z-30 border-b border-line bg-bg/85 backdrop-blur-md xl:static xl:border-0 xl:bg-transparent xl:backdrop-blur-none">
+        <div className="mx-auto flex h-14 max-w-[1600px] items-center gap-3 px-4 xl:h-16">
           <div className="flex items-center gap-2">
             <span className="grid size-8 place-items-center rounded-xl bg-accent text-on-accent">
               <CheckCircle size={20} weight="fill" />
@@ -60,7 +72,7 @@ export default function App() {
             <span className="font-title text-lg font-semibold">Habits</span>
           </div>
 
-          <nav aria-label="Main" className="ml-auto hidden gap-1 rounded-2xl bg-surface-2 p-1 sm:flex">
+          <nav aria-label="Main" className="ml-auto hidden gap-1 rounded-2xl bg-surface-2 p-1 sm:flex xl:hidden">
             {TABS.map(([id, label, Icon]) => (
               <button
                 key={id}
@@ -75,39 +87,62 @@ export default function App() {
             ))}
           </nav>
 
-          <button
-            onClick={() => setTheme(isDark ? "light" : "dark")}
-            aria-label={isDark ? "Switch to light theme" : "Switch to dark theme"}
-            className="press ml-auto grid size-10 place-items-center rounded-full bg-surface-2 text-ink-2 sm:ml-0"
-          >
-            {isDark ? <Sun size={20} /> : <Moon size={20} />}
-          </button>
+          <div className="ml-auto flex gap-2 sm:ml-0 xl:ml-auto">
+            <button
+              onClick={() => setTheme(isDark ? "light" : "dark")}
+              aria-label={isDark ? "Switch to light theme" : "Switch to dark theme"}
+              className="press grid size-10 place-items-center rounded-full bg-surface-2 text-ink-2"
+            >
+              {isDark ? <Sun size={20} /> : <Moon size={20} />}
+            </button>
+            <button
+              onClick={() => setSheet({ kind: "settings" })}
+              aria-label="Settings"
+              className="press grid size-10 place-items-center rounded-full bg-surface-2 text-ink-2"
+            >
+              <GearSix size={20} />
+            </button>
+          </div>
         </div>
       </header>
 
-      <main className={`mx-auto ${width} px-4 pt-4 pb-[calc(96px+env(safe-area-inset-bottom))] sm:pt-6 sm:pb-12`}>
-        {tab === "today" && (
-          <div className={`grid gap-4 ${wide ? "lg:grid-cols-2 lg:items-start lg:gap-6" : ""}`}>
-            <TodayScreen store={store} today={today} onAdd={openAdd} onEdit={openEdit} onSample={() => store.replaceAll(sampleData())} />
-            <StatsPanel data={store.data} today={today} />
+      <main className="mx-auto max-w-[1600px] px-4 pt-4 pb-[calc(96px+env(safe-area-inset-bottom))] sm:pt-6 sm:pb-12 xl:grid xl:grid-cols-[300px_minmax(0,1fr)_340px] xl:items-start xl:gap-6 xl:pt-2">
+        <aside className={`${pane("focus")} space-y-4`}>
+          <h2 className="text-3xl font-semibold xl:hidden">Focus</h2>
+          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-1">
+            <QuickTimer />
+            {GROUPS.map((g) => (
+              <GroupCard key={g.id} group={g} items={todayItems.filter((i) => i.group.id === g.id)} onToggle={(i) => toggle(i, today)} />
+            ))}
           </div>
-        )}
-        {tab === "habits" && <HabitsScreen store={store} theme={theme} setTheme={setTheme} onAdd={openAdd} onEdit={openEdit} />}
+        </aside>
+
+        <section className={`${pane("tasks")} min-w-0 xl:border-x xl:border-line xl:px-6`}>
+          <WeekBoard
+            data={data}
+            today={today}
+            onToggle={toggle}
+            onAdd={(day) => setSheet({ kind: "add", day })}
+            onEdit={edit}
+          />
+        </section>
+
+        <aside className={pane("progress")}>
+          <ProgressPanel data={data} today={today} />
+        </aside>
       </main>
 
       <nav
         aria-label="Main"
         className="fixed inset-x-0 bottom-0 z-30 border-t border-line bg-surface/90 pb-[env(safe-area-inset-bottom)] backdrop-blur-md sm:hidden"
       >
-        <div className="grid grid-cols-2">
+        <div className="grid grid-cols-3">
           {TABS.map(([id, label, Icon]) => (
             <button
               key={id}
               onClick={() => setTab(id)}
               aria-current={tab === id ? "page" : undefined}
-              className={`flex h-16 flex-col items-center justify-center gap-0.5 text-[11px] font-semibold ${
-                tab === id ? "text-accent" : "text-ink-3"
-              }`}
+              className={`flex h-16 flex-col items-center justify-center gap-0.5 text-[11px] font-semibold ${tab === id ? "text-accent" : "text-ink-3"}`}
             >
               <Icon size={24} weight={tab === id ? "fill" : "regular"} />
               {label}
@@ -116,14 +151,17 @@ export default function App() {
         </div>
       </nav>
 
-      {sheet && (
-        <HabitSheet
-          habit={sheet.habit}
+      {sheet?.kind === "add" && <TaskSheet day={sheet.day} onSave={store.addTask} onClose={() => setSheet(null)} />}
+      {sheet?.kind === "edit" && (
+        <TaskSheet
+          day={sheet.task.day}
+          task={sheet.task}
+          onSave={(t) => store.updateTask(sheet.task.id, t)}
+          onDelete={() => store.deleteTask(sheet.task.id)}
           onClose={() => setSheet(null)}
-          onSave={(name, color) => (sheet.habit ? store.updateHabit(sheet.habit.id, { name, color }) : store.addHabit(name, color))}
-          onDelete={sheet.habit ? () => store.deleteHabit(sheet.habit!.id) : undefined}
         />
       )}
+      {sheet?.kind === "settings" && <SettingsSheet store={store} theme={theme} setTheme={setTheme} onClose={() => setSheet(null)} />}
     </div>
   )
 }

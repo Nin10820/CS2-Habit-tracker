@@ -57,6 +57,57 @@ button:disabled {
 }
 }
 
+/*
+ * Scrollbars, everywhere in the app:
+ * - never any arrow buttons
+ * - at most 6px wide
+ * - hidden until you scroll, hover the area, or the page has just opened
+ * src/lib/scrollbars.ts sets [data-scrolling] while an area scrolls and
+ * html.scroll-intro for a moment after load.
+ * Don't set scrollbar-width / scrollbar-color in components: in Chrome that
+ * switches off these rules.
+ */
+:root {
+  --scroll-thumb: color-mix(in oklab, var(--text) 30%, transparent);
+}
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+  background: transparent;
+}
+::-webkit-scrollbar-button {
+  display: none;
+  width: 0;
+  height: 0;
+}
+::-webkit-scrollbar-track,
+::-webkit-scrollbar-corner {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  border-radius: 999px;
+  background: transparent;
+}
+:hover::-webkit-scrollbar-thumb,
+[data-scrolling]::-webkit-scrollbar-thumb,
+html.scroll-intro ::-webkit-scrollbar-thumb,
+html.scroll-intro::-webkit-scrollbar-thumb {
+  background: var(--scroll-thumb);
+}
+/* Firefox has no ::-webkit-scrollbar: its "thin" bar has no arrows and is the narrowest it allows. */
+@supports not selector(::-webkit-scrollbar) {
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: transparent transparent;
+  }
+  :hover,
+  [data-scrolling],
+  html.scroll-intro,
+  html.scroll-intro * {
+    scrollbar-color: var(--scroll-thumb) transparent;
+  }
+}
+
 /* A habit row sets --hc to its colour; these read it. */
 .hc-fill {
   background: var(--hc);

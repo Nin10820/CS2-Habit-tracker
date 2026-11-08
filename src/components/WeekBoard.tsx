@@ -1,10 +1,9 @@
-import { CalendarBlank, CaretDown, CaretLeft, CaretRight, Check, Funnel } from "@phosphor-icons/react"
+import { CalendarBlank, CaretDown, CaretLeft, CaretRight, Clock } from "@phosphor-icons/react"
 import { useEffect, useRef, useState, type ReactNode } from "react"
-import { GROUPS } from "../config/groups"
+import { useClock } from "../lib/clock"
 import { addDays, dayOfMonth, formatDow, formatFull, formatLong, formatWeekRange, isoWeek, startOfWeek, weekOf, type DayKey } from "../lib/date"
 import { itemsForDay } from "../lib/stats"
 import type { AppData, DayItem } from "../lib/types"
-import { colorVar } from "../lib/types"
 import { DayColumn } from "./DayColumn"
 import { Ring } from "./ui"
 
@@ -59,14 +58,12 @@ export function WeekBoard({
   const [weekStart, setWeekStart] = useState(() => startOfWeek(today))
   const [picked, setPicked] = useState<DayKey>(today)
   const [view, setView] = useView()
-  const [hidden, setHidden] = useState<Set<string>>(new Set())
-  const [filterOpen, setFilterOpen] = useState(false)
   const scroller = useRef<HTMLDivElement>(null)
-  const filterRef = useRef<HTMLDivElement>(null)
+  const clock = useClock()
 
   const days = weekOf(weekStart)
   const day = days.includes(picked) ? picked : days[0]
-  const itemsOf = (d: DayKey) => itemsForDay(data, d).filter((i) => !hidden.has(i.group.id))
+  const itemsOf = (d: DayKey) => itemsForDay(data, d)
 
   // Bring today's column into view on load and whenever "Today" is pressed.
   const [scrollKey, setScrollKey] = useState(0)
@@ -77,18 +74,6 @@ export function WeekBoard({
     const left = sc.scrollLeft + el.getBoundingClientRect().left - sc.getBoundingClientRect().left - parseFloat(getComputedStyle(sc).paddingLeft)
     sc.scrollTo({ left, behavior: scrollKey ? "smooth" : "auto" })
   }, [scrollKey, today, weekStart, view])
-
-  useEffect(() => {
-    if (!filterOpen) return
-    const close = (e: MouseEvent) => !filterRef.current?.contains(e.target as Node) && setFilterOpen(false)
-    const esc = (e: KeyboardEvent) => e.key === "Escape" && setFilterOpen(false)
-    document.addEventListener("mousedown", close)
-    document.addEventListener("keydown", esc)
-    return () => {
-      document.removeEventListener("mousedown", close)
-      document.removeEventListener("keydown", esc)
-    }
-  }, [filterOpen])
 
   const goToday = () => {
     setWeekStart(startOfWeek(today))
@@ -146,46 +131,11 @@ export function WeekBoard({
           <button onClick={goToday} className={`${btn} bg-accent-soft text-accent`}>
             <CalendarBlank size={18} /> Today
           </button>
-          <div ref={filterRef} className="relative">
-            <button
-              onClick={() => setFilterOpen((o) => !o)}
-              aria-expanded={filterOpen}
-              aria-haspopup="true"
-              className={`${btn} border border-line bg-surface ${hidden.size ? "text-accent" : "text-ink-2"}`}
-            >
-              <Funnel size={18} weight={hidden.size ? "fill" : "regular"} /> Filter <CaretDown size={12} weight="bold" />
-            </button>
-            {filterOpen && (
-              <div className="absolute right-0 z-20 mt-2 w-56 rounded-2xl border border-line bg-surface p-2 shadow-card">
-                <p className="px-2 pt-1 pb-2 text-xs font-semibold text-ink-3">Show groups</p>
-                {GROUPS.map((g) => {
-                  const on = !hidden.has(g.id)
-                  const Icon = g.icon
-                  return (
-                    <button
-                      key={g.id}
-                      role="menuitemcheckbox"
-                      aria-checked={on}
-                      onClick={() =>
-                        setHidden((h) => {
-                          const n = new Set(h)
-                          if (on) n.add(g.id)
-                          else n.delete(g.id)
-                          return n
-                        })
-                      }
-                      style={{ ["--hc" as string]: colorVar(g.color) }}
-                      className="flex w-full items-center gap-2 rounded-xl px-2 py-2 text-left text-sm"
-                    >
-                      <span className={`grid size-5 place-items-center rounded-md border-2 ${on ? "bg-accent border-transparent text-on-accent" : "border-line"}`}>
-                        {on && <Check size={12} weight="bold" />}
-                      </span>
-                      <Icon size={16} className="hc-text" /> {g.label}
-                    </button>
-                  )
-                })}
-              </div>
-            )}
+          <div
+            aria-label={`Current time ${clock}`}
+            className="flex h-10 items-center gap-1.5 rounded-xl border border-line bg-surface px-3 text-sm font-semibold text-ink tabular-nums"
+          >
+            <Clock size={18} className="text-ink-2" /> {clock}
           </div>
           {trailing}
         </div>
@@ -218,6 +168,7 @@ export function WeekBoard({
         </div>
         <DayColumn
           className="mt-4"
+          now={clock}
           day={day}
           today={today}
           items={itemsOf(day)}
@@ -237,8 +188,8 @@ export function WeekBoard({
       >
         {view === "day" ? (
           <DayColumn
-            className="min-w-0 flex-1"
-            grid
+            className="mx-auto w-full max-w-3xl"
+            now={clock}
             day={day}
             today={today}
             items={itemsOf(day)}

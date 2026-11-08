@@ -1,19 +1,10 @@
 import { ChartBar, CheckSquare, Clock, Fire, Target, TrendUp } from "@phosphor-icons/react"
-import { useEffect, useState } from "react"
 import { DAILY_GOAL } from "../config/groups"
+import { useClock } from "../lib/clock"
 import { formatDow, weekOf, type DayKey } from "../lib/date"
 import { allHabitsStreak, dayTotals, pct } from "../lib/stats"
 import type { AppData } from "../lib/types"
 import { Bar, Card } from "./ui"
-
-function useClock() {
-  const [now, setNow] = useState(() => new Date())
-  useEffect(() => {
-    const id = setInterval(() => setNow(new Date()), 10_000)
-    return () => clearInterval(id)
-  }, [])
-  return now.toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" })
-}
 
 const Label = ({ icon: Icon, children }: { icon: typeof Target; children: string }) => (
   <p className="flex items-center gap-2 text-xs font-semibold tracking-wider text-ink-2 uppercase">

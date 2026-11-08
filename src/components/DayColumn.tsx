@@ -1,4 +1,5 @@
 import { Check, PencilSimple, Plus } from "@phosphor-icons/react"
+import { Fragment } from "react"
 import { dayOfMonth, formatDow, type DayKey } from "../lib/date"
 import { fmtDuration } from "../lib/stats"
 import { colorVar, type DayItem } from "../lib/types"
@@ -15,7 +16,7 @@ export function DayColumn({
   onFocus,
   focusKey,
   className = "",
-  grid = false,
+  now,
 }: {
   day: DayKey
   today: DayKey
@@ -28,12 +29,15 @@ export function DayColumn({
   /** "day:kind:id" of the focused item, to highlight it. */
   focusKey?: string
   className?: string
-  /** Day view: lay the cards out in a grid instead of one column. */
-  grid?: boolean
+  /** Current "HH:MM". When given and this is today, a "Now" marker sits between past and upcoming items. */
+  now?: string
 }) {
   const isToday = day === today
   const future = day > today
   const done = items.filter((i) => i.done).length
+  // Untimed items sort last, so they fall after the marker.
+  const nowAt = now && isToday ? items.findIndex((i) => (i.time ?? "99:99") > now) : -2
+  const marker = nowAt === -2 ? -1 : nowAt === -1 ? items.length : nowAt
 
   return (
     <section data-day={day} aria-label={`${formatDow(day)} ${dayOfMonth(day)}`} className={`flex flex-col gap-2 ${className}`}>
@@ -63,20 +67,33 @@ export function DayColumn({
 
       {items.length === 0 && <p className="px-1 py-3 text-center text-xs text-ink-3">Nothing planned.</p>}
 
-      <ul className={grid ? "grid grid-cols-[repeat(auto-fill,minmax(220px,1fr))] gap-3" : "flex flex-col gap-2"}>
-        {items.map((i) => (
-          <TaskCard
-            key={`${i.kind}-${i.id}`}
-            item={i}
-            future={future}
-            focused={focusKey === `${day}:${i.kind}:${i.id}`}
-            onToggle={() => onToggle(i)}
-            onEdit={() => onEdit(i)}
-            onFocus={() => onFocus(i)}
-          />
+      <ul className="flex flex-col gap-2">
+        {items.map((i, idx) => (
+          <Fragment key={`${i.kind}-${i.id}`}>
+            {idx === marker && <NowMarker time={now!} />}
+            <TaskCard
+              item={i}
+              future={future}
+              focused={focusKey === `${day}:${i.kind}:${i.id}`}
+              onToggle={() => onToggle(i)}
+              onEdit={() => onEdit(i)}
+              onFocus={() => onFocus(i)}
+            />
+          </Fragment>
         ))}
+        {marker === items.length && items.length > 0 && <NowMarker time={now!} />}
       </ul>
     </section>
+  )
+}
+
+/** Thin line with the current time, between what's past and what's next. */
+function NowMarker({ time }: { time: string }) {
+  return (
+    <li aria-label={`Now, ${time}`} className="flex items-center gap-2 py-0.5">
+      <span className="rounded-full bg-accent px-2 py-0.5 text-[11px] font-semibold text-on-accent tabular-nums">Now · {time}</span>
+      <span className="h-0.5 flex-1 rounded-full bg-accent" aria-hidden />
+    </li>
   )
 }
 

@@ -12,7 +12,8 @@ same three parts as tabs (Tasks · Focus · Progress).
   Click any habit or task (a card, or a name in a group) to put it in the timer's **Task** section: the focus clock takes that
   item's duration, and you can tick it from there. The circle or box ticks; one-off tasks have a pencil to edit.
 - **My tasks** (middle): the whole week, Monday–Sunday. Each day lists that day's habits and one-off tasks as cards, sorted by time.
-  Prev/next week, **Today**, and **Filter** by group. On phones a week strip picks one day.
+  Prev/next, **Today**, the current time, and a Day / Week switch. Day view is one top-down list with a "Now" line.
+  On phones a week strip picks one day.
 - **Your progress** (right): daily goal, tasks completed per day this week, completion-rate line, tasks done this week, streak
   (days in a row with every habit done).
 

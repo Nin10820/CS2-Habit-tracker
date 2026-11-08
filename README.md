@@ -4,7 +4,9 @@ A personal habit and task dashboard by Pham Nguyen Studio. Early v0.1, runs loca
 
 ## Layout
 
-From 1280px wide it's three columns. Narrower screens show the same three parts as tabs (Tasks · Focus · Progress).
+From 1280px wide it fills the screen as three columns, with a top bar over the middle one. The buttons at each end of the
+top bar hide or show the left (Focus) and right (Progress) panels; the choice is remembered. Narrower screens show the
+same three parts as tabs (Tasks · Focus · Progress).
 
 - **Focus** (left): quick timer (focus / break, with a chime when it ends) and one card per group ("big task") with today's checklist.
 - **My tasks** (middle): the whole week, Monday–Sunday. Each day lists that day's habits and one-off tasks as cards, sorted by time.

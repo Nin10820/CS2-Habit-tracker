@@ -32,8 +32,8 @@ export function ProgressPanel({ data, today, showTitle = true }: { data: AppData
   return (
     <div className="space-y-4">
       {showTitle && (
-        <div className="flex items-center justify-between gap-3">
-          <h2 className="text-3xl font-semibold">Your progress</h2>
+        <div className="flex items-center justify-between gap-3 xl:h-16">
+          <h2 className="text-2xl font-semibold">Your progress</h2>
           <span className="flex items-center gap-1.5 text-base text-ink-2 tabular-nums">
             <Clock size={18} /> {clock}
           </span>

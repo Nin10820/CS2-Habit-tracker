@@ -1,4 +1,4 @@
-import { ChartBar, CheckCircle, GearSix, Kanban, Moon, Sun, Timer as TimerIcon } from "@phosphor-icons/react"
+import { ChartBar, GearSix, Kanban, Moon, SidebarSimple, Sun, Timer as TimerIcon } from "@phosphor-icons/react"
 import { useEffect, useState, type ComponentType } from "react"
 import { GroupCard } from "./components/GroupCard"
 import { ProgressPanel } from "./components/ProgressPanel"
@@ -37,7 +37,29 @@ function useToday() {
   return today
 }
 
+/** Open/closed state of a side panel, remembered in this browser. */
+function usePanel(name: string) {
+  const key = `habit-tracker:panel-${name}`
+  const [open, setOpen] = useState(() => {
+    try {
+      return localStorage.getItem(key) !== "closed"
+    } catch {
+      return true
+    }
+  })
+  useEffect(() => {
+    try {
+      localStorage.setItem(key, open ? "open" : "closed")
+    } catch {
+      /* ignore */
+    }
+  }, [key, open])
+  return [open, setOpen] as const
+}
+
 type SheetState = { kind: "add"; day: DayKey } | { kind: "edit"; task: Task } | { kind: "settings" } | null
+
+const iconBtn = "press grid size-10 shrink-0 place-items-center rounded-full text-ink-2"
 
 export default function App() {
   const store = useStore()
@@ -46,6 +68,8 @@ export default function App() {
   const [theme, setTheme, isDark] = useTheme()
   const [tab, setTab] = useState<Tab>("tasks")
   const [sheet, setSheet] = useState<SheetState>(null)
+  const [leftOpen, setLeftOpen] = usePanel("left")
+  const [rightOpen, setRightOpen] = usePanel("right")
 
   useEffect(() => {
     window.scrollTo(0, 0)
@@ -58,79 +82,106 @@ export default function App() {
   }
   const todayItems = itemsForDay(data, today)
 
-  // Visible on its own tab below 1280px; always visible as a column from 1280px.
-  const pane = (t: Tab) => `${tab === t ? "" : "hidden"} xl:block`
+  const themeBtn = (
+    <button
+      onClick={() => setTheme(isDark ? "light" : "dark")}
+      aria-label={isDark ? "Switch to light theme" : "Switch to dark theme"}
+      className={`${iconBtn} bg-surface-2`}
+    >
+      {isDark ? <Sun size={20} /> : <Moon size={20} />}
+    </button>
+  )
+  const settingsBtn = (
+    <button onClick={() => setSheet({ kind: "settings" })} aria-label="Settings" className={`${iconBtn} bg-surface-2`}>
+      <GearSix size={20} />
+    </button>
+  )
+
+  // Below 1280px only the current tab shows. From 1280px all three show, and the side panels can be closed.
+  const show = (t: Tab) => (tab === t ? "block" : "hidden")
+  const pad = "px-4 pt-4 pb-[calc(96px+env(safe-area-inset-bottom))] sm:px-6 sm:pb-12"
 
   return (
-    <div className="min-h-dvh">
-      <header className="sticky top-0 z-30 border-b border-line bg-bg/85 backdrop-blur-md xl:static xl:border-0 xl:bg-transparent xl:backdrop-blur-none">
-        <div className="flex h-14 w-full items-center gap-3 px-4 sm:px-6 xl:h-16">
-          <div className="flex items-center gap-2">
-            <span className="grid size-8 place-items-center rounded-xl bg-accent text-on-accent">
-              <CheckCircle size={20} weight="fill" />
-            </span>
-            <span className="font-title text-lg font-semibold">Habits</span>
-          </div>
-
-          <nav aria-label="Main" className="ml-auto hidden gap-1 rounded-2xl bg-surface-2 p-1 sm:flex xl:hidden">
-            {TABS.map(([id, label, Icon]) => (
-              <button
-                key={id}
-                onClick={() => setTab(id)}
-                aria-current={tab === id ? "page" : undefined}
-                className={`press flex h-9 items-center gap-1.5 rounded-xl px-3 text-sm font-semibold ${
-                  tab === id ? "bg-surface text-ink shadow-card" : "text-ink-2"
-                }`}
-              >
-                <Icon size={18} weight={tab === id ? "fill" : "regular"} /> {label}
-              </button>
-            ))}
-          </nav>
-
-          <div className="ml-auto flex gap-2 sm:ml-0 xl:ml-auto">
+    <div className="min-h-dvh xl:flex xl:h-dvh xl:overflow-hidden">
+      {/* Small screens: theme, settings and (from 640px) the tabs. No logo. */}
+      <header className="sticky top-0 z-30 flex h-14 items-center gap-2 border-b border-line bg-bg/85 px-4 backdrop-blur-md sm:px-6 xl:hidden">
+        <nav aria-label="Main" className="hidden gap-1 rounded-2xl bg-surface-2 p-1 sm:flex">
+          {TABS.map(([id, label, Icon]) => (
             <button
-              onClick={() => setTheme(isDark ? "light" : "dark")}
-              aria-label={isDark ? "Switch to light theme" : "Switch to dark theme"}
-              className="press grid size-10 place-items-center rounded-full bg-surface-2 text-ink-2"
+              key={id}
+              onClick={() => setTab(id)}
+              aria-current={tab === id ? "page" : undefined}
+              className={`press flex h-9 items-center gap-1.5 rounded-xl px-3 text-sm font-semibold ${
+                tab === id ? "bg-surface text-ink shadow-card" : "text-ink-2"
+              }`}
             >
-              {isDark ? <Sun size={20} /> : <Moon size={20} />}
+              <Icon size={18} weight={tab === id ? "fill" : "regular"} /> {label}
             </button>
-            <button
-              onClick={() => setSheet({ kind: "settings" })}
-              aria-label="Settings"
-              className="press grid size-10 place-items-center rounded-full bg-surface-2 text-ink-2"
-            >
-              <GearSix size={20} />
-            </button>
-          </div>
+          ))}
+        </nav>
+        <div className="ml-auto flex gap-2">
+          {themeBtn}
+          {settingsBtn}
         </div>
       </header>
 
-      <main className="w-full px-4 sm:px-6 pt-4 pb-[calc(96px+env(safe-area-inset-bottom))] sm:pt-6 sm:pb-12 xl:grid xl:grid-cols-[300px_minmax(0,1fr)_340px] xl:items-start xl:gap-6 xl:pt-2">
-        <aside className={`${pane("focus")} space-y-4`}>
-          <h2 className="text-3xl font-semibold xl:hidden">Focus</h2>
-          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-1">
-            <QuickTimer />
-            {GROUPS.map((g) => (
-              <GroupCard key={g.id} group={g} items={todayItems.filter((i) => i.group.id === g.id)} onToggle={(i) => toggle(i, today)} />
-            ))}
-          </div>
-        </aside>
+      <aside
+        aria-label="Focus"
+        className={`${show("focus")} ${pad} ${leftOpen ? "xl:block" : "xl:hidden"} xl:w-[320px] xl:shrink-0 xl:overflow-y-auto xl:border-r xl:border-line xl:px-4 xl:pt-0 xl:pb-6`}
+      >
+        <div className="flex items-center pb-4 xl:h-16 xl:pb-0">
+          <h2 className="text-2xl font-semibold">Focus</h2>
+        </div>
+        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-1">
+          <QuickTimer />
+          {GROUPS.map((g) => (
+            <GroupCard key={g.id} group={g} items={todayItems.filter((i) => i.group.id === g.id)} onToggle={(i) => toggle(i, today)} />
+          ))}
+        </div>
+      </aside>
 
-        <section className={`${pane("tasks")} min-w-0 xl:border-x xl:border-line xl:px-6`}>
-          <WeekBoard
-            data={data}
-            today={today}
-            onToggle={toggle}
-            onAdd={(day) => setSheet({ kind: "add", day })}
-            onEdit={edit}
-          />
-        </section>
+      <section aria-label="My tasks" className={`${show("tasks")} ${pad} min-w-0 xl:flex xl:flex-1 xl:flex-col xl:p-0`}>
+        <WeekBoard
+          data={data}
+          today={today}
+          onToggle={toggle}
+          onAdd={(day) => setSheet({ kind: "add", day })}
+          onEdit={edit}
+          leading={
+            <button
+              onClick={() => setLeftOpen((o) => !o)}
+              aria-pressed={leftOpen}
+              aria-label={leftOpen ? "Hide focus panel" : "Show focus panel"}
+              title={leftOpen ? "Hide focus panel" : "Show focus panel"}
+              className={`${iconBtn} hidden border border-line xl:grid`}
+            >
+              <SidebarSimple size={20} weight={leftOpen ? "regular" : "fill"} />
+            </button>
+          }
+          trailing={
+            <div className="hidden gap-2 xl:flex">
+              {themeBtn}
+              {settingsBtn}
+              <button
+                onClick={() => setRightOpen((o) => !o)}
+                aria-pressed={rightOpen}
+                aria-label={rightOpen ? "Hide progress panel" : "Show progress panel"}
+                title={rightOpen ? "Hide progress panel" : "Show progress panel"}
+                className={`${iconBtn} border border-line`}
+              >
+                <SidebarSimple size={20} weight={rightOpen ? "regular" : "fill"} className="-scale-x-100" />
+              </button>
+            </div>
+          }
+        />
+      </section>
 
-        <aside className={pane("progress")}>
-          <ProgressPanel data={data} today={today} />
-        </aside>
-      </main>
+      <aside
+        aria-label="Your progress"
+        className={`${show("progress")} ${pad} ${rightOpen ? "xl:block" : "xl:hidden"} xl:w-[360px] xl:shrink-0 xl:overflow-y-auto xl:border-l xl:border-line xl:px-4 xl:pt-0 xl:pb-6`}
+      >
+        <ProgressPanel data={data} today={today} />
+      </aside>
 
       <nav
         aria-label="Main"

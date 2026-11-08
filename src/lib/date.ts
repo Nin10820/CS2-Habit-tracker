@@ -57,5 +57,14 @@ export const formatMonthYear = (k: DayKey) => monthYearFmt.format(fromKey(k))
 const WEEKDAYS = ["sun", "mon", "tue", "wed", "thu", "fri", "sat"] as const
 export const weekdayId = (k: DayKey) => WEEKDAYS[fromKey(k).getDay()]
 
+/** ISO week number (weeks start Monday; week 1 holds the year's first Thursday). */
+export function isoWeek(key: DayKey): number {
+  const thu = fromKey(addDays(startOfWeek(key), 3))
+  const jan1 = new Date(thu.getFullYear(), 0, 1)
+  // Round to whole days first so a daylight-saving hour can't shift the result.
+  const days = Math.round((thu.getTime() - jan1.getTime()) / 86_400_000)
+  return Math.floor(days / 7) + 1
+}
+
 /** Monday..Sunday of the week containing `key`. */
 export const weekOf = (key: DayKey) => range(startOfWeek(key), addDays(startOfWeek(key), 6))

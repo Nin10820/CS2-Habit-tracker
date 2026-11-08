@@ -19,7 +19,8 @@ same three parts as tabs (Tasks · Focus · Progress).
 ## Groups and habits are set in code
 
 Edit [`src/config/groups.ts`](src/config/groups.ts): groups, the habits in each (name, time, duration, which weekdays),
-`DAILY_GOAL`, and the timer lengths. The habits in there now are placeholders.
+`DAILY_GOAL`, and the timer lengths. Each group links a Markdown write-up in `src/content/groups/` (`doc`), which the
+⤢ button on its card opens in a popup. Edit the .md file to change what the popup shows.
 Keep habit `id`s stable once you've used them: check-ins are saved by id.
 
 In the app, **Add task** adds a one-off task to a single day (tap its card to edit or delete).

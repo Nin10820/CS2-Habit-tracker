@@ -1,7 +1,8 @@
-import { CaretDown, Check } from "@phosphor-icons/react"
+import { ArrowsOutSimple, CaretDown, Check } from "@phosphor-icons/react"
 import { useState } from "react"
 import type { GroupDef } from "../config/groups"
 import { colorVar, type DayItem } from "../lib/types"
+import { DocSheet } from "./DocSheet"
 import { Card } from "./ui"
 
 /** A "big task": its title from config and today's checklist. Box ticks; the name puts the item in the Quick timer. */
@@ -20,28 +21,40 @@ export function GroupCard({
   focusedId?: string
 }) {
   const [open, setOpen] = useState(true)
+  const [reading, setReading] = useState(false)
   const done = items.filter((i) => i.done).length
   const Icon = group.icon
 
   return (
     <Card className="!p-0">
       <div style={{ ["--hc" as string]: colorVar(group.color) }}>
-        <button
-          onClick={() => setOpen((o) => !o)}
-          aria-expanded={open}
-          className="flex w-full items-start gap-3 px-4 pt-4 pb-3 text-left sm:px-5"
-        >
-          <span className="min-w-0 flex-1">
+        <div className="flex items-start gap-1.5 px-4 pt-4 pb-3 sm:px-5">
+          <button onClick={() => setOpen((o) => !o)} aria-expanded={open} className="min-w-0 flex-1 text-left">
             <span className="flex items-center gap-2 text-xs font-semibold tracking-wider text-ink-2 uppercase">
               <Icon size={16} className="hc-text" /> {group.label}
             </span>
             <span className="mt-1 block font-title text-lg leading-snug font-semibold">{group.title}</span>
             {group.note && <span className="mt-0.5 block text-sm text-ink-3">{group.note}</span>}
-          </span>
-          <span className={`grid size-8 shrink-0 place-items-center rounded-full bg-surface-2 text-ink-2 transition-transform ${open ? "" : "-rotate-90"}`}>
+          </button>
+          {group.doc && (
+            <button
+              onClick={() => setReading(true)}
+              aria-label={`Open ${group.label} notes`}
+              title="Open notes"
+              className="press grid size-8 shrink-0 place-items-center rounded-full bg-surface-2 text-ink-2"
+            >
+              <ArrowsOutSimple size={14} weight="bold" />
+            </button>
+          )}
+          <button
+            onClick={() => setOpen((o) => !o)}
+            aria-expanded={open}
+            aria-label={open ? `Collapse ${group.label}` : `Expand ${group.label}`}
+            className={`press grid size-8 shrink-0 place-items-center rounded-full bg-surface-2 text-ink-2 transition-transform ${open ? "" : "-rotate-90"}`}
+          >
             <CaretDown size={14} weight="bold" />
-          </span>
-        </button>
+          </button>
+        </div>
 
         {open && (
           <div className="px-2 pb-3 sm:px-3">
@@ -87,6 +100,7 @@ export function GroupCard({
           </div>
         )}
       </div>
+      {reading && <DocSheet group={group} onClose={() => setReading(false)} />}
     </Card>
   )
 }

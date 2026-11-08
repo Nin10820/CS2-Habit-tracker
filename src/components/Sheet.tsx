@@ -1,8 +1,23 @@
 import { X } from "@phosphor-icons/react"
 import { useEffect, useRef, type ReactNode } from "react"
 
-/** Bottom sheet on phones, centred dialog from 640px up. Closes on Esc and backdrop click. */
-export function Sheet({ title, onClose, children }: { title: string; onClose: () => void; children: ReactNode }) {
+/**
+ * Bottom sheet on phones, centred dialog from 640px up. Closes on Esc and backdrop click.
+ * `wide` is for reading: a larger panel whose body scrolls, with `header` shown above the title.
+ */
+export function Sheet({
+  title,
+  onClose,
+  children,
+  wide = false,
+  header,
+}: {
+  title: string
+  onClose: () => void
+  children: ReactNode
+  wide?: boolean
+  header?: ReactNode
+}) {
   const panel = useRef<HTMLDivElement>(null)
   const close = useRef(onClose)
   close.current = onClose
@@ -11,7 +26,8 @@ export function Sheet({ title, onClose, children }: { title: string; onClose: ()
     const prev = document.activeElement as HTMLElement | null
     const onKey = (e: KeyboardEvent) => e.key === "Escape" && close.current()
     window.addEventListener("keydown", onKey)
-    const first = panel.current?.querySelector<HTMLElement>("input, button:not([data-close])")
+    // Forms focus their first field; a reading panel focuses itself so it doesn't jump to a link.
+    const first = wide ? panel.current : panel.current?.querySelector<HTMLElement>("input, button:not([data-close])")
     first?.focus()
     document.body.style.overflow = "hidden"
     return () => {
@@ -29,20 +45,34 @@ export function Sheet({ title, onClose, children }: { title: string; onClose: ()
         role="dialog"
         aria-modal="true"
         aria-label={title}
-        className="sheet-in relative w-full max-w-md rounded-t-3xl bg-surface px-5 pt-5 pb-[max(20px,env(safe-area-inset-bottom))] shadow-card sm:rounded-3xl sm:pb-5"
+        tabIndex={wide ? -1 : undefined}
+        className={`sheet-in relative w-full rounded-t-3xl bg-surface shadow-card outline-none sm:rounded-3xl ${
+          wide
+            ? "flex max-h-[92dvh] max-w-3xl flex-col sm:max-h-[88dvh]"
+            : "max-w-md px-5 pt-5 pb-[max(20px,env(safe-area-inset-bottom))] sm:pb-5"
+        }`}
       >
-        <div className="mb-4 flex items-center justify-between gap-3">
-          <h2 className="text-lg font-semibold">{title}</h2>
+        <div
+          className={`flex justify-between gap-3 ${wide ? "shrink-0 items-start border-b border-line px-5 pt-5 pb-4 sm:px-8 sm:pt-6" : "mb-4 items-center"}`}
+        >
+          <div className="min-w-0">
+            {header}
+            <h2 className={`font-semibold ${wide ? "text-2xl" : "text-lg"}`}>{title}</h2>
+          </div>
           <button
             data-close
             onClick={onClose}
             aria-label="Close"
-            className="press grid size-9 place-items-center rounded-full bg-surface-2 text-ink-2"
+            className="press grid size-9 shrink-0 place-items-center rounded-full bg-surface-2 text-ink-2"
           >
             <X size={18} weight="bold" />
           </button>
         </div>
-        {children}
+        {wide ? (
+          <div className="min-h-0 overflow-y-auto px-5 pt-4 pb-[max(24px,env(safe-area-inset-bottom))] sm:px-8 sm:pb-8">{children}</div>
+        ) : (
+          children
+        )}
       </div>
     </div>
   )

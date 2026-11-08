@@ -6,21 +6,9 @@ import { bestStreak, completion, currentStreak, pct, totalCheckIns } from "../li
 import type { AppData } from "../lib/types"
 import { colorVar } from "../lib/types"
 
-export function StatsScreen({ data, today, onGoToday }: { data: AppData; today: DayKey; onGoToday: () => void }) {
-  if (data.habits.length === 0) {
-    return (
-      <Card className="px-6 py-10 text-center">
-        <div className="mx-auto grid size-14 place-items-center rounded-2xl bg-accent-soft text-accent">
-          <ChartBar size={28} weight="bold" />
-        </div>
-        <h1 className="mt-4 text-2xl font-semibold">No stats yet</h1>
-        <p className="mx-auto mt-2 max-w-xs text-ink-2">Add a habit and check in for a few days. Your week, month and streaks show up here.</p>
-        <button onClick={onGoToday} className="press mt-6 h-12 rounded-2xl bg-accent px-5 font-semibold text-on-accent">
-          Go to Today
-        </button>
-      </Card>
-    )
-  }
+/** Week/month numbers, 30-day chart and per-habit breakdown. Shown under the Today list (beside it on wide screens). */
+export function StatsPanel({ data, today }: { data: AppData; today: DayKey }) {
+  if (data.habits.length === 0) return null
 
   const week = completion(data, data.habits, startOfWeek(today), today, today)
   const month = completion(data, data.habits, startOfMonth(today), today, today)
@@ -29,9 +17,11 @@ export function StatsScreen({ data, today, onGoToday }: { data: AppData; today: 
 
   return (
     <div className="space-y-4">
-      <h1 className="text-2xl font-semibold">Stats</h1>
+      <h2 className="flex items-center gap-2 pt-2 text-xl font-semibold lg:pt-0">
+        <ChartBar size={22} className="text-accent" /> Progress
+      </h2>
 
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4 lg:grid-cols-2">
         <Kpi label="This week" value={pct(week.rate)} sub={`${week.done} of ${week.possible} check-ins`} />
         <Kpi label={formatMonth(today)} value={pct(month.rate)} sub={`${month.done} of ${month.possible} check-ins`} />
         <Kpi

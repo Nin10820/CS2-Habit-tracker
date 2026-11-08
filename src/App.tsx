@@ -1,4 +1,4 @@
-import { ChartBar, ListChecks, Moon, Sun, CheckCircle } from "@phosphor-icons/react"
+import { ListChecks, Moon, Sun, CheckCircle } from "@phosphor-icons/react"
 import { useEffect, useState, type ComponentType } from "react"
 import { HabitSheet } from "./components/HabitSheet"
 import { todayKey } from "./lib/date"
@@ -6,14 +6,13 @@ import { sampleData, useHabitStore } from "./lib/store"
 import { useTheme } from "./lib/theme"
 import type { Habit } from "./lib/types"
 import { HabitsScreen } from "./screens/HabitsScreen"
-import { StatsScreen } from "./screens/StatsScreen"
+import { StatsPanel } from "./screens/StatsPanel"
 import { TodayScreen } from "./screens/TodayScreen"
 
-type Tab = "today" | "stats" | "habits"
+type Tab = "today" | "habits"
 type IconT = ComponentType<{ size?: number; weight?: "regular" | "fill" | "bold" }>
 const TABS: [Tab, string, IconT][] = [
   ["today", "Today", CheckCircle],
-  ["stats", "Stats", ChartBar],
   ["habits", "Habits", ListChecks],
 ]
 
@@ -43,13 +42,17 @@ export default function App() {
     window.scrollTo(0, 0)
   }, [tab])
 
+  // Today with habits is a two-column dashboard on wide screens; everything else stays a narrow column.
+  const wide = tab === "today" && store.data.habits.length > 0
+  const width = wide ? "max-w-2xl lg:max-w-5xl" : "max-w-2xl"
+
   const openAdd = () => setSheet({})
   const openEdit = (habit: Habit) => setSheet({ habit })
 
   return (
     <div className="min-h-dvh">
       <header className="sticky top-0 z-30 border-b border-line bg-bg/85 backdrop-blur-md">
-        <div className="mx-auto flex h-14 max-w-2xl items-center gap-3 px-4">
+        <div className={`mx-auto flex h-14 ${width} items-center gap-3 px-4`}>
           <div className="flex items-center gap-2">
             <span className="grid size-8 place-items-center rounded-xl bg-accent text-on-accent">
               <CheckCircle size={20} weight="fill" />
@@ -82,11 +85,13 @@ export default function App() {
         </div>
       </header>
 
-      <main className="mx-auto max-w-2xl px-4 pt-4 pb-[calc(96px+env(safe-area-inset-bottom))] sm:pt-6 sm:pb-12">
+      <main className={`mx-auto ${width} px-4 pt-4 pb-[calc(96px+env(safe-area-inset-bottom))] sm:pt-6 sm:pb-12`}>
         {tab === "today" && (
-          <TodayScreen store={store} today={today} onAdd={openAdd} onEdit={openEdit} onSample={() => store.replaceAll(sampleData())} />
+          <div className={`grid gap-4 ${wide ? "lg:grid-cols-2 lg:items-start lg:gap-6" : ""}`}>
+            <TodayScreen store={store} today={today} onAdd={openAdd} onEdit={openEdit} onSample={() => store.replaceAll(sampleData())} />
+            <StatsPanel data={store.data} today={today} />
+          </div>
         )}
-        {tab === "stats" && <StatsScreen data={store.data} today={today} onGoToday={() => setTab("today")} />}
         {tab === "habits" && <HabitsScreen store={store} theme={theme} setTheme={setTheme} onAdd={openAdd} onEdit={openEdit} />}
       </main>
 
@@ -94,7 +99,7 @@ export default function App() {
         aria-label="Main"
         className="fixed inset-x-0 bottom-0 z-30 border-t border-line bg-surface/90 pb-[env(safe-area-inset-bottom)] backdrop-blur-md sm:hidden"
       >
-        <div className="grid grid-cols-3">
+        <div className="grid grid-cols-2">
           {TABS.map(([id, label, Icon]) => (
             <button
               key={id}

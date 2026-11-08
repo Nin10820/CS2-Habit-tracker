@@ -44,4 +44,5 @@ export function allHabitsStreak(data: AppData, today: DayKey): number {
 
 export const pct = (rate: number | null) => (rate === null ? "–" : `${Math.round(rate * 100)}%`)
 
-export const fmtMinutes = (m?: number) => (m ? (m >= 60 ? `${Math.floor(m / 60)} h${m % 60 ? ` ${m % 60} min` : ""}` : `${m} min`) : "")
+/** "0:30", "1:15" — compact duration for task cards. */
+export const fmtDuration = (m: number) => `${Math.floor(m / 60)}:${String(m % 60).padStart(2, "0")}`

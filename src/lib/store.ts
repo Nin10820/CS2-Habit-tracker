@@ -7,7 +7,7 @@ const DATA_KEY = "habit-tracker:v2"
 const dayRe = /^\d{4}-\d{2}-\d{2}$/
 const timeRe = /^\d{2}:\d{2}$/
 
-export const emptyData = (): AppData => ({ version: 2, startedAt: todayKey(), checks: {}, tasks: [] })
+export const emptyData = (): AppData => ({ version: 2, startedAt: todayKey(), checks: {}, tasks: [], times: {} })
 
 function load(): AppData {
   try {
@@ -50,8 +50,16 @@ export function parseData(input: unknown): AppData {
     ]
   })
 
+  const times: AppData["times"] = {}
+  for (const [day, cards] of Object.entries((obj.times ?? {}) as Record<string, unknown>)) {
+    if (!dayRe.test(day) || !cards || typeof cards !== "object") continue
+    for (const [key, t] of Object.entries(cards as Record<string, unknown>)) {
+      if (typeof t === "string" && timeRe.test(t)) (times[day] ??= {})[key] = t
+    }
+  }
+
   const startedAt = typeof obj.startedAt === "string" && dayRe.test(obj.startedAt) ? obj.startedAt : todayKey()
-  return { version: 2, startedAt, checks, tasks }
+  return { version: 2, startedAt, checks, tasks, times }
 }
 
 const newId = () =>
@@ -98,9 +106,21 @@ export function useStore() {
     setData((d) => ({ ...d, tasks: d.tasks.filter((t) => t.id !== id) }))
   }, [])
 
+  /** Change a card's time for one day; null goes back to the expected time. */
+  const setTime = useCallback((day: DayKey, key: string, time: string | null) => {
+    setData((d) => {
+      const dayTimes = { ...(d.times[day] ?? {}) }
+      if (time) dayTimes[key] = time
+      else delete dayTimes[key]
+      const times = { ...d.times, [day]: dayTimes }
+      if (!Object.keys(dayTimes).length) delete times[day]
+      return { ...d, times }
+    })
+  }, [])
+
   const replaceAll = useCallback((next: AppData) => setData(next), [])
 
-  return { data, toggleHabit, addTask, updateTask, toggleTask, deleteTask, replaceAll }
+  return { data, toggleHabit, addTask, updateTask, toggleTask, deleteTask, setTime, replaceAll }
 }
 
 export type Store = ReturnType<typeof useStore>

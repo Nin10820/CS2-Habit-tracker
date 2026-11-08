@@ -82,7 +82,7 @@ export function TaskSheet({
                     on ? "hc-soft border-transparent text-ink" : "border-line text-ink-2"
                   }`}
                 >
-                  <Icon size={15} className="hc-text" /> {g.label}
+                  <Icon size={15} className="hc-text" /> {g.standalone ? "Single card" : g.label}
                 </button>
               )
             })}

@@ -2,7 +2,7 @@ import { CalendarBlank, CaretDown, CaretLeft, CaretRight, Clock } from "@phospho
 import { useEffect, useRef, useState, type ReactNode } from "react"
 import { useClock } from "../lib/clock"
 import { addDays, dayOfMonth, formatDow, formatFull, formatLong, formatWeekRange, isoWeek, startOfWeek, weekOf, type DayKey } from "../lib/date"
-import { itemsForDay } from "../lib/stats"
+import { blocksForDay, itemsForDay } from "../lib/stats"
 import type { AppData, DayItem } from "../lib/types"
 import { DayColumn } from "./DayColumn"
 import { Ring } from "./ui"
@@ -40,6 +40,7 @@ export function WeekBoard({
   onAdd,
   onEdit,
   onFocus,
+  onSetTime,
   focusKey,
   leading,
   trailing,
@@ -50,6 +51,7 @@ export function WeekBoard({
   onAdd: (day: DayKey) => void
   onEdit: (item: DayItem) => void
   onFocus: (item: DayItem, day: DayKey) => void
+  onSetTime: (day: DayKey, key: string, time: string | null) => void
   focusKey?: string
   /** Extra controls at the start / end of the top bar (panel toggles, theme, settings). */
   leading?: ReactNode
@@ -63,7 +65,6 @@ export function WeekBoard({
 
   const days = weekOf(weekStart)
   const day = days.includes(picked) ? picked : days[0]
-  const itemsOf = (d: DayKey) => itemsForDay(data, d)
 
   // Bring today's column into view on load and whenever "Today" is pressed.
   const [scrollKey, setScrollKey] = useState(0)
@@ -171,7 +172,8 @@ export function WeekBoard({
           now={clock}
           day={day}
           today={today}
-          items={itemsOf(day)}
+          blocks={blocksForDay(data, day)}
+          onSetTime={(key, t) => onSetTime(day, key, t)}
           onToggle={(i) => onToggle(i, day)}
           onAdd={() => onAdd(day)}
           onEdit={onEdit}
@@ -192,7 +194,8 @@ export function WeekBoard({
             now={clock}
             day={day}
             today={today}
-            items={itemsOf(day)}
+            blocks={blocksForDay(data, day)}
+          onSetTime={(key, t) => onSetTime(day, key, t)}
             onToggle={(i) => onToggle(i, day)}
             onAdd={() => onAdd(day)}
             onEdit={onEdit}
@@ -206,7 +209,8 @@ export function WeekBoard({
               className="min-w-[236px] flex-1 snap-start xl:min-w-[128px]"
               day={k}
               today={today}
-              items={itemsOf(k)}
+              blocks={blocksForDay(data, k)}
+              onSetTime={(key, t) => onSetTime(k, key, t)}
               onToggle={(i) => onToggle(i, k)}
               onAdd={() => onAdd(k)}
               onEdit={onEdit}

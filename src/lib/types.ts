@@ -19,9 +19,11 @@ export type AppData = {
   /** habitId → days it was done. */
   checks: Record<string, Record<DayKey, true>>
   tasks: Task[]
+  /** Times changed on one day: day → card key → "HH:MM". The config time is only the expected one. */
+  times: Record<DayKey, Record<string, string>>
 }
 
-/** What a day column shows: config habits and one-off tasks, in one list. */
+/** One habit or one-off task on a day (flat; used for stats, focus and checklists). */
 export type DayItem = {
   kind: "habit" | "task"
   id: string
@@ -32,4 +34,12 @@ export type DayItem = {
   done: boolean
 }
 
-export const colorVar = (c: GroupColor) => `var(--h-${c})`
+/**
+ * What a day column shows: one card per group holding its items, or a single card for standalone items.
+ * `key` identifies the card for time changes; `expected` is the config/task time, `time` what's shown.
+ */
+export type DayBlock =
+  | { kind: "group"; key: string; group: GroupDef; items: DayItem[]; time?: string; expected?: string }
+  | { kind: "single"; key: string; item: DayItem; time?: string; expected?: string }
+
+export const colorVar =(c: GroupColor) => `var(--h-${c})`

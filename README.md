@@ -24,7 +24,11 @@ Edit [`src/config/groups.ts`](src/config/groups.ts): groups, the habits in each 
 ⤢ button on its card opens in a popup. Edit the .md file to change what the popup shows.
 Keep habit `id`s stable once you've used them: check-ins are saved by id.
 
-In the app, **Add task** adds a one-off task to a single day (tap its card to edit or delete).
+On a day, each group is **one card** holding its habits (and that day's one-off tasks for the group). Habits in a
+standalone group (`Routine`: Dậy sớm, Planning cho hôm sau) are single cards. Times in the config are only the
+**expected** times: click a card's time to change it for that day; ↺ puts it back.
+
+In the app, **Add task** adds a one-off task to a single day, inside a group's card or as a single card (edit with the pencil).
 
 ## Data
 

@@ -168,7 +168,7 @@ export default function App() {
             onToggleTask={() => focused && focus && toggle(focused, focus.day)}
             onClearTask={() => setFocus(null)}
           />
-          {GROUPS.map((g) => (
+          {GROUPS.filter((g) => !g.standalone).map((g) => (
             <GroupCard
               key={g.id}
               group={g}
@@ -189,6 +189,7 @@ export default function App() {
           onAdd={(day) => setSheet({ kind: "add", day })}
           onEdit={edit}
           onFocus={pickFocus}
+          onSetTime={store.setTime}
           focusKey={focusKey}
           leading={
             <button

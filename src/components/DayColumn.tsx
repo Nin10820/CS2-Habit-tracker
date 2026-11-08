@@ -13,6 +13,7 @@ export function DayColumn({
   onAdd,
   onEdit,
   className = "",
+  grid = false,
 }: {
   day: DayKey
   today: DayKey
@@ -21,6 +22,8 @@ export function DayColumn({
   onAdd: () => void
   onEdit: (item: DayItem) => void
   className?: string
+  /** Day view: lay the cards out in a grid instead of one column. */
+  grid?: boolean
 }) {
   const isToday = day === today
   const future = day > today
@@ -54,7 +57,7 @@ export function DayColumn({
 
       {items.length === 0 && <p className="px-1 py-3 text-center text-xs text-ink-3">Nothing planned.</p>}
 
-      <ul className="flex flex-col gap-2">
+      <ul className={grid ? "grid grid-cols-[repeat(auto-fill,minmax(220px,1fr))] gap-3" : "flex flex-col gap-2"}>
         {items.map((i) => (
           <TaskCard key={`${i.kind}-${i.id}`} item={i} future={future} onToggle={() => onToggle(i)} onEdit={() => onEdit(i)} />
         ))}

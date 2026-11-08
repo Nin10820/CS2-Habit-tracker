@@ -1,12 +1,34 @@
 import { CalendarBlank, CaretDown, CaretLeft, CaretRight, Check, Funnel } from "@phosphor-icons/react"
 import { useEffect, useRef, useState, type ReactNode } from "react"
 import { GROUPS } from "../config/groups"
-import { addDays, dayOfMonth, formatDow, formatLong, formatMonthYear, isoWeek, startOfWeek, weekOf, type DayKey } from "../lib/date"
+import { addDays, dayOfMonth, formatDow, formatFull, formatLong, formatWeekRange, isoWeek, startOfWeek, weekOf, type DayKey } from "../lib/date"
 import { itemsForDay } from "../lib/stats"
 import type { AppData, DayItem } from "../lib/types"
 import { colorVar } from "../lib/types"
 import { DayColumn } from "./DayColumn"
 import { Ring } from "./ui"
+
+type View = "day" | "week"
+
+/** Day or Week view (from 768px), remembered in this browser. */
+function useView() {
+  const KEY = "habit-tracker:view"
+  const [view, setView] = useState<View>(() => {
+    try {
+      return localStorage.getItem(KEY) === "day" ? "day" : "week"
+    } catch {
+      return "week"
+    }
+  })
+  useEffect(() => {
+    try {
+      localStorage.setItem(KEY, view)
+    } catch {
+      /* ignore */
+    }
+  }, [view])
+  return [view, setView] as const
+}
 
 /**
  * "My tasks": the whole week. From 768px the seven days sit side by side and scroll sideways;
@@ -32,6 +54,7 @@ export function WeekBoard({
 }) {
   const [weekStart, setWeekStart] = useState(() => startOfWeek(today))
   const [picked, setPicked] = useState<DayKey>(today)
+  const [view, setView] = useView()
   const [hidden, setHidden] = useState<Set<string>>(new Set())
   const [filterOpen, setFilterOpen] = useState(false)
   const scroller = useRef<HTMLDivElement>(null)
@@ -49,7 +72,7 @@ export function WeekBoard({
     if (!el || !sc) return
     const left = sc.scrollLeft + el.getBoundingClientRect().left - sc.getBoundingClientRect().left - parseFloat(getComputedStyle(sc).paddingLeft)
     sc.scrollTo({ left, behavior: scrollKey ? "smooth" : "auto" })
-  }, [scrollKey, today, weekStart])
+  }, [scrollKey, today, weekStart, view])
 
   useEffect(() => {
     if (!filterOpen) return
@@ -68,32 +91,54 @@ export function WeekBoard({
     setPicked(today)
     setScrollKey((k) => k + 1)
   }
-  const shiftWeek = (n: number) => {
+  // Arrows move a day in Day view, a week in Week view.
+  const shift = (n: number) => {
+    if (view === "day") {
+      const next = addDays(day, n)
+      setPicked(next)
+      setWeekStart(startOfWeek(next))
+      return
+    }
     const next = addDays(weekStart, n * 7)
     setWeekStart(next)
     setPicked(next <= today && today <= addDays(next, 6) ? today : next)
   }
+  const unit = view === "day" ? "day" : "week"
 
   const btn = "press flex h-10 items-center gap-1.5 rounded-xl px-3 text-sm font-semibold"
 
   return (
     <div className="flex min-w-0 flex-col xl:h-full">
       {/* Top bar. From 1280px it spans the middle column, with the panel toggles at its ends. */}
-      <div className="flex flex-wrap items-center gap-x-2 gap-y-3 xl:h-16 xl:shrink-0 xl:flex-nowrap xl:border-b xl:border-line xl:px-4">
+      <div className="flex flex-wrap items-center gap-x-3 gap-y-3 xl:h-16 xl:shrink-0 xl:flex-nowrap xl:border-b xl:border-line xl:px-4">
         {leading}
-        <div className="flex">
-          <button onClick={() => shiftWeek(-1)} aria-label="Previous week" className="press grid size-9 place-items-center rounded-full text-ink-2">
+        <div className="flex shrink-0 rounded-full border border-line bg-surface">
+          <button onClick={() => shift(-1)} aria-label={`Previous ${unit}`} className="press grid size-9 place-items-center rounded-full text-ink-2">
             <CaretLeft size={16} weight="bold" />
           </button>
-          <button onClick={() => shiftWeek(1)} aria-label="Next week" className="press grid size-9 place-items-center rounded-full text-ink-2">
+          <button onClick={() => shift(1)} aria-label={`Next ${unit}`} className="press grid size-9 place-items-center rounded-full text-ink-2">
             <CaretRight size={16} weight="bold" />
           </button>
         </div>
-        <h1 className="text-2xl font-semibold whitespace-nowrap sm:text-3xl">My tasks</h1>
-        <span className="pt-1 text-xs font-semibold tracking-wider whitespace-nowrap text-ink-3 uppercase">
-          {formatMonthYear(day)} · Week {isoWeek(day)}
-        </span>
-        <div className="ml-auto flex items-center gap-2">
+        <div className="flex min-w-0 flex-1 basis-0 items-baseline gap-2 md:flex-none md:basis-auto">
+          <h1 className="truncate text-lg font-semibold sm:text-2xl xl:text-[28px]">
+            {view === "day" ? formatFull(day) : formatWeekRange(weekStart)}
+          </h1>
+          <span className="shrink-0 text-xs font-semibold tracking-wider whitespace-nowrap text-ink-2 uppercase sm:text-sm">Week {isoWeek(day)}</span>
+        </div>
+        <div className="relative hidden shrink-0 md:block">
+          <select
+            value={view}
+            onChange={(e) => setView(e.target.value as View)}
+            aria-label="View"
+            className="press h-10 appearance-none rounded-full border border-line bg-surface pr-9 pl-4 text-sm font-semibold text-ink outline-none focus-visible:border-accent"
+          >
+            <option value="day">Day</option>
+            <option value="week">Week</option>
+          </select>
+          <CaretDown size={12} weight="bold" className="pointer-events-none absolute top-1/2 right-4 -translate-y-1/2 text-ink-2" />
+        </div>
+        <div className="flex w-full items-center justify-end gap-2 md:ml-auto md:w-auto">
           <button onClick={goToday} className={`${btn} bg-accent-soft text-accent`}>
             <CalendarBlank size={18} /> Today
           </button>
@@ -184,18 +229,31 @@ export function WeekBoard({
         className="mt-5 hidden snap-x scroll-px-4 xl:scroll-px-20 items-start gap-3 overflow-x-auto pb-3 md:flex xl:mt-0 xl:min-h-0 xl:flex-1 xl:overflow-auto xl:px-20 xl:py-4"
         style={{ scrollbarWidth: "thin" }}
       >
-        {days.map((k) => (
+        {view === "day" ? (
           <DayColumn
-            key={k}
-            className="min-w-[236px] flex-1 snap-start xl:min-w-[128px]"
-            day={k}
+            className="min-w-0 flex-1"
+            grid
+            day={day}
             today={today}
-            items={itemsOf(k)}
-            onToggle={(i) => onToggle(i, k)}
-            onAdd={() => onAdd(k)}
+            items={itemsOf(day)}
+            onToggle={(i) => onToggle(i, day)}
+            onAdd={() => onAdd(day)}
             onEdit={onEdit}
           />
-        ))}
+        ) : (
+          days.map((k) => (
+            <DayColumn
+              key={k}
+              className="min-w-[236px] flex-1 snap-start xl:min-w-[128px]"
+              day={k}
+              today={today}
+              items={itemsOf(k)}
+              onToggle={(i) => onToggle(i, k)}
+              onAdd={() => onAdd(k)}
+              onEdit={onEdit}
+            />
+          ))
+        )}
       </div>
     </div>
   )

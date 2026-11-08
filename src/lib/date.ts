@@ -51,6 +51,20 @@ export const formatDow = (k: DayKey) => dowFmt.format(fromKey(k))
 export const formatMonth = (k: DayKey) => monthFmt.format(fromKey(k))
 export const dayOfMonth = (k: DayKey) => fromKey(k).getDate()
 
+const fullFmt = new Intl.DateTimeFormat("en-US", { weekday: "long", month: "long", day: "2-digit", year: "numeric" })
+/** "Sunday, November 08, 2026" */
+export const formatFull = (k: DayKey) => fullFmt.format(fromKey(k))
+
+/** "November 2 – 8, 2026", or "October 26 – November 1, 2026" across months. */
+export function formatWeekRange(start: DayKey): string {
+  const end = addDays(start, 6)
+  const [s, e] = [fromKey(start), fromKey(end)]
+  const month = (d: Date) => d.toLocaleDateString("en-US", { month: "long" })
+  if (s.getFullYear() !== e.getFullYear()) return `${month(s)} ${s.getDate()}, ${s.getFullYear()} – ${month(e)} ${e.getDate()}, ${e.getFullYear()}`
+  if (s.getMonth() !== e.getMonth()) return `${month(s)} ${s.getDate()} – ${month(e)} ${e.getDate()}, ${e.getFullYear()}`
+  return `${month(s)} ${s.getDate()} – ${e.getDate()}, ${e.getFullYear()}`
+}
+
 const monthYearFmt = fmt({ month: "long", year: "numeric" })
 export const formatMonthYear = (k: DayKey) => monthYearFmt.format(fromKey(k))
 

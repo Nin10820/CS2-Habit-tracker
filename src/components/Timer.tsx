@@ -1,6 +1,8 @@
-import { ArrowCounterClockwise, Pause, Play, Timer as TimerIcon } from "@phosphor-icons/react"
+import { ArrowCounterClockwise, Check, Pause, Play, Timer as TimerIcon, X } from "@phosphor-icons/react"
 import { useEffect, useRef, useState } from "react"
 import { BREAK_MINUTES, FOCUS_MINUTES } from "../config/groups"
+import { formatShort, type DayKey } from "../lib/date"
+import { colorVar, type DayItem } from "../lib/types"
 import { Card } from "./ui"
 
 type Mode = "focus" | "break"
@@ -32,30 +34,49 @@ function chime() {
   }
 }
 
-/** Focus / break countdown. One runs at a time; each keeps its remaining time while paused. */
-export function QuickTimer() {
-  const [left, setLeft] = useState<Record<Mode, number>>({ ...LENGTH })
+export type FocusTask = { item: DayItem; day: DayKey; today: DayKey }
+
+/**
+ * Focus / break countdown. One runs at a time; each keeps its remaining time while paused.
+ * With a task picked, the focus length is that task's duration.
+ */
+export function QuickTimer({ task, onToggleTask, onClearTask }: { task?: FocusTask; onToggleTask: () => void; onClearTask: () => void }) {
+  const focusMs = (task?.item.minutes ?? FOCUS_MINUTES) * 60_000
+  const lengths = useRef<Record<Mode, number>>({ ...LENGTH, focus: focusMs })
+  lengths.current = { ...LENGTH, focus: focusMs }
+
+  const [left, setLeft] = useState<Record<Mode, number>>(() => ({ ...lengths.current }))
   const [running, setRunning] = useState<Mode | null>(null)
   const [finished, setFinished] = useState<Mode | null>(null)
   const endsAt = useRef(0)
   const baseTitle = useRef(document.title)
+  const taskName = task?.item.name
+
+  // A new task (or none) resets the focus clock to its length, unless a focus session is running.
+  const taskKey = task ? `${task.day}:${task.item.kind}:${task.item.id}` : ""
+  const runningRef = useRef(running)
+  runningRef.current = running
+  useEffect(() => {
+    setFinished(null)
+    if (runningRef.current !== "focus") setLeft((l) => ({ ...l, focus: lengths.current.focus }))
+  }, [taskKey, focusMs])
 
   useEffect(() => {
     if (!running) return
     const id = setInterval(() => {
       const ms = Math.max(0, endsAt.current - Date.now())
       setLeft((l) => ({ ...l, [running]: ms }))
-      document.title = `${mmss(ms)} · ${running === "focus" ? "Focus" : "Break"}`
+      document.title = `${mmss(ms)} · ${running === "focus" ? (taskName ?? "Focus") : "Break"}`
       if (ms === 0) {
         setRunning(null)
         setFinished(running)
-        setLeft((l) => ({ ...l, [running]: LENGTH[running] }))
+        setLeft((l) => ({ ...l, [running]: lengths.current[running] }))
         document.title = running === "focus" ? "Focus done · time for a break" : "Break over"
         chime()
       }
     }, 250)
     return () => clearInterval(id)
-  }, [running])
+  }, [running, taskName])
 
   useEffect(() => {
     const t = baseTitle.current
@@ -77,7 +98,7 @@ export function QuickTimer() {
 
   function reset(mode: Mode) {
     if (running === mode) setRunning(null)
-    setLeft((l) => ({ ...l, [mode]: LENGTH[mode] }))
+    setLeft((l) => ({ ...l, [mode]: lengths.current[mode] }))
     document.title = baseTitle.current
   }
 
@@ -86,9 +107,48 @@ export function QuickTimer() {
       <p className="flex items-center gap-2 text-xs font-semibold tracking-wider text-ink-2 uppercase">
         <TimerIcon size={16} /> Quick timer
       </p>
+
+      {/* Task: what this focus session is for. Picked by clicking a habit or task anywhere. */}
+      <section aria-label="Task" className="mt-3 rounded-2xl bg-surface-2 p-3">
+        <p className="text-[11px] font-semibold tracking-wider text-ink-3 uppercase">Task</p>
+        {task ? (
+          <div className="mt-1.5 flex items-start gap-2.5" style={{ ["--hc" as string]: colorVar(task.item.group.color) }}>
+            <button
+              onClick={onToggleTask}
+              disabled={task.day > task.today}
+              aria-pressed={task.item.done}
+              aria-label={task.item.done ? `Mark ${task.item.name} not done` : `Mark ${task.item.name} done`}
+              className="-m-1 grid shrink-0 place-items-center p-1 disabled:opacity-35"
+            >
+              <span
+                className={`grid size-6 place-items-center rounded-full border-2 ${
+                  task.item.done ? "hc-fill border-transparent text-white" : "border-line text-ink-3"
+                }`}
+              >
+                <Check size={12} weight="bold" className={task.item.done ? "pop" : "opacity-60"} />
+              </span>
+            </button>
+            <div className="min-w-0 flex-1">
+              <p className={`font-semibold leading-snug break-words ${task.item.done ? "text-ink-3" : ""}`}>{task.item.name}</p>
+              <p className="mt-0.5 truncate text-xs text-ink-3">
+                <span className="hc-text font-semibold">#</span>
+                {task.item.group.label}
+                {task.item.minutes ? ` · ${task.item.minutes} min` : ""}
+                {task.day === task.today ? "" : ` · ${formatShort(task.day)}`}
+              </p>
+            </div>
+            <button onClick={onClearTask} aria-label="Stop focusing on this task" className="press -m-1 grid size-8 shrink-0 place-items-center rounded-full text-ink-3">
+              <X size={14} weight="bold" />
+            </button>
+          </div>
+        ) : (
+          <p className="mt-1 text-sm text-ink-3">Click a habit or task to focus on it.</p>
+        )}
+      </section>
+
       {(["focus", "break"] as const).map((mode) => {
         const on = running === mode
-        const touched = left[mode] !== LENGTH[mode]
+        const touched = left[mode] !== lengths.current[mode]
         return (
           <div key={mode} className="mt-3">
             <p className="text-xs font-medium text-ink-3">{mode === "focus" ? "Focus time" : "Break time"}</p>

@@ -9,6 +9,8 @@ top bar hide or show the left (Focus) and right (Progress) panels; the choice is
 same three parts as tabs (Tasks · Focus · Progress).
 
 - **Focus** (left): quick timer (focus / break, with a chime when it ends) and one card per group ("big task") with today's checklist.
+  Click any habit or task (a card, or a name in a group) to put it in the timer's **Task** section: the focus clock takes that
+  item's duration, and you can tick it from there. The circle or box ticks; one-off tasks have a pencil to edit.
 - **My tasks** (middle): the whole week, Monday–Sunday. Each day lists that day's habits and one-off tasks as cards, sorted by time.
   Prev/next week, **Today**, and **Filter** by group. On phones a week strip picks one day.
 - **Your progress** (right): daily goal, tasks completed per day this week, completion-rate line, tasks done this week, streak

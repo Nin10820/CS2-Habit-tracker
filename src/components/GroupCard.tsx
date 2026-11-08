@@ -4,8 +4,21 @@ import type { GroupDef } from "../config/groups"
 import { colorVar, type DayItem } from "../lib/types"
 import { Card } from "./ui"
 
-/** A "big task": its title from config and today's checklist for that group. */
-export function GroupCard({ group, items, onToggle }: { group: GroupDef; items: DayItem[]; onToggle: (item: DayItem) => void }) {
+/** A "big task": its title from config and today's checklist. Box ticks; the name puts the item in the Quick timer. */
+export function GroupCard({
+  group,
+  items,
+  onToggle,
+  onFocus,
+  focusedId,
+}: {
+  group: GroupDef
+  items: DayItem[]
+  onToggle: (item: DayItem) => void
+  onFocus: (item: DayItem) => void
+  /** "kind:id" of today's focused item, if any. */
+  focusedId?: string
+}) {
   const [open, setOpen] = useState(true)
   const done = items.filter((i) => i.done).length
   const Icon = group.icon
@@ -36,22 +49,36 @@ export function GroupCard({ group, items, onToggle }: { group: GroupDef; items: 
               <p className="px-2 py-1 text-sm text-ink-3">Nothing scheduled today.</p>
             ) : (
               <ul>
-                {items.map((i) => (
-                  <li key={i.id}>
-                    <button
-                      onClick={() => onToggle(i)}
-                      aria-pressed={i.done}
-                      className={`flex w-full items-center gap-3 rounded-xl px-2 py-2 text-left text-sm transition-colors ${i.done ? "hc-soft" : ""}`}
+                {items.map((i) => {
+                  const focused = focusedId === `${i.kind}:${i.id}`
+                  return (
+                    <li
+                      key={`${i.kind}-${i.id}`}
+                      className={`flex items-center rounded-xl transition-colors ${focused ? "ring-2 ring-accent ring-inset" : ""} ${i.done ? "hc-soft" : ""}`}
                     >
-                      <span
-                        className={`grid size-5 shrink-0 place-items-center rounded-md border-2 ${i.done ? "hc-fill border-transparent text-white" : "border-line"}`}
+                      <button
+                        onClick={() => onToggle(i)}
+                        aria-pressed={i.done}
+                        aria-label={i.done ? `Mark ${i.name} not done` : `Mark ${i.name} done`}
+                        className="grid shrink-0 place-items-center py-2 pr-1.5 pl-2"
                       >
-                        {i.done && <Check size={12} weight="bold" />}
-                      </span>
-                      <span className="min-w-0 flex-1 truncate">{i.name}</span>
-                    </button>
-                  </li>
-                ))}
+                        <span
+                          className={`grid size-5 place-items-center rounded-md border-2 ${i.done ? "hc-fill border-transparent text-white" : "border-line"}`}
+                        >
+                          {i.done && <Check size={12} weight="bold" />}
+                        </span>
+                      </button>
+                      <button
+                        onClick={() => onFocus(i)}
+                        aria-current={focused ? "true" : undefined}
+                        title="Focus on this"
+                        className="min-w-0 flex-1 truncate py-2 pr-2 pl-1.5 text-left text-sm"
+                      >
+                        {i.name}
+                      </button>
+                    </li>
+                  )
+                })}
               </ul>
             )}
             <p className="mx-2 mt-2 border-t border-line pt-2 text-xs text-ink-3">

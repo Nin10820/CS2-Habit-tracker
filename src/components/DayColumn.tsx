@@ -1,4 +1,4 @@
-import { Check, Plus } from "@phosphor-icons/react"
+import { Check, PencilSimple, Plus } from "@phosphor-icons/react"
 import { dayOfMonth, formatDow, type DayKey } from "../lib/date"
 import { fmtDuration } from "../lib/stats"
 import { colorVar, type DayItem } from "../lib/types"
@@ -12,6 +12,8 @@ export function DayColumn({
   onToggle,
   onAdd,
   onEdit,
+  onFocus,
+  focusKey,
   className = "",
   grid = false,
 }: {
@@ -21,6 +23,10 @@ export function DayColumn({
   onToggle: (item: DayItem) => void
   onAdd: () => void
   onEdit: (item: DayItem) => void
+  /** Clicking a card puts it in the Quick timer. */
+  onFocus: (item: DayItem) => void
+  /** "day:kind:id" of the focused item, to highlight it. */
+  focusKey?: string
   className?: string
   /** Day view: lay the cards out in a grid instead of one column. */
   grid?: boolean
@@ -59,29 +65,47 @@ export function DayColumn({
 
       <ul className={grid ? "grid grid-cols-[repeat(auto-fill,minmax(220px,1fr))] gap-3" : "flex flex-col gap-2"}>
         {items.map((i) => (
-          <TaskCard key={`${i.kind}-${i.id}`} item={i} future={future} onToggle={() => onToggle(i)} onEdit={() => onEdit(i)} />
+          <TaskCard
+            key={`${i.kind}-${i.id}`}
+            item={i}
+            future={future}
+            focused={focusKey === `${day}:${i.kind}:${i.id}`}
+            onToggle={() => onToggle(i)}
+            onEdit={() => onEdit(i)}
+            onFocus={() => onFocus(i)}
+          />
         ))}
       </ul>
     </section>
   )
 }
 
-function TaskCard({ item, future, onToggle, onEdit }: { item: DayItem; future: boolean; onToggle: () => void; onEdit: () => void }) {
+function TaskCard({
+  item,
+  future,
+  focused,
+  onToggle,
+  onEdit,
+  onFocus,
+}: {
+  item: DayItem
+  future: boolean
+  focused: boolean
+  onToggle: () => void
+  onEdit: () => void
+  onFocus: () => void
+}) {
   const Icon = item.group.icon
-  // Habits toggle from anywhere on the card; one-off tasks open their editor, and the circle toggles.
-  const onBody = item.kind === "task" ? onEdit : future ? undefined : onToggle
-
   const chip = "rounded-md px-1.5 py-0.5 text-xs font-semibold tabular-nums whitespace-nowrap"
 
-  // Layout: time ··· duration / title / tick + group icon ··· # group.
+  // Layout: time ··· duration / title / tick + group icon (or edit, for one-off tasks) ··· # group.
+  // The card body puts it in the Quick timer; the circle ticks it.
   return (
-    <li style={{ ["--hc" as string]: colorVar(item.group.color) }} className="rounded-xl border border-line bg-surface shadow-card">
-      <button
-        onClick={onBody}
-        disabled={!onBody}
-        className="block w-full px-3 pt-3 text-left"
-        aria-label={item.kind === "task" ? `Edit ${item.name}` : undefined}
-      >
+    <li
+      style={{ ["--hc" as string]: colorVar(item.group.color) }}
+      className={`rounded-xl border bg-surface shadow-card ${focused ? "border-transparent ring-2 ring-accent" : "border-line"}`}
+    >
+      <button onClick={onFocus} aria-current={focused ? "true" : undefined} title="Focus on this" className="block w-full px-3 pt-3 text-left">
         {(item.time || item.minutes) && (
           <span className="flex items-center gap-2">
             {item.time && <span className={`${chip} hc-soft text-ink`}>{item.time}</span>}
@@ -106,7 +130,13 @@ function TaskCard({ item, future, onToggle, onEdit }: { item: DayItem; future: b
             <Check size={12} weight="bold" className={item.done ? "pop" : "opacity-60"} />
           </span>
         </button>
-        <Icon size={15} className="hc-text shrink-0" aria-hidden />
+        {item.kind === "task" ? (
+          <button onClick={onEdit} aria-label={`Edit ${item.name}`} title="Edit task" className="press -m-1.5 grid shrink-0 place-items-center rounded-full p-1.5 text-ink-3">
+            <PencilSimple size={15} />
+          </button>
+        ) : (
+          <Icon size={15} className="hc-text shrink-0" aria-hidden />
+        )}
         <span className="ml-auto min-w-0 truncate text-xs text-ink-3" title={item.group.label}>
           <span className="hc-text font-semibold">#</span>
           {item.group.label}

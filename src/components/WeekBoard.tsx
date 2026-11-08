@@ -40,6 +40,8 @@ export function WeekBoard({
   onToggle,
   onAdd,
   onEdit,
+  onFocus,
+  focusKey,
   leading,
   trailing,
 }: {
@@ -48,6 +50,8 @@ export function WeekBoard({
   onToggle: (item: DayItem, day: DayKey) => void
   onAdd: (day: DayKey) => void
   onEdit: (item: DayItem) => void
+  onFocus: (item: DayItem, day: DayKey) => void
+  focusKey?: string
   /** Extra controls at the start / end of the top bar (panel toggles, theme, settings). */
   leading?: ReactNode
   trailing?: ReactNode
@@ -220,6 +224,8 @@ export function WeekBoard({
           onToggle={(i) => onToggle(i, day)}
           onAdd={() => onAdd(day)}
           onEdit={onEdit}
+          onFocus={(i) => onFocus(i, day)}
+          focusKey={focusKey}
         />
       </div>
 
@@ -239,6 +245,8 @@ export function WeekBoard({
             onToggle={(i) => onToggle(i, day)}
             onAdd={() => onAdd(day)}
             onEdit={onEdit}
+            onFocus={(i) => onFocus(i, day)}
+            focusKey={focusKey}
           />
         ) : (
           days.map((k) => (
@@ -251,6 +259,8 @@ export function WeekBoard({
               onToggle={(i) => onToggle(i, k)}
               onAdd={() => onAdd(k)}
               onEdit={onEdit}
+              onFocus={(i) => onFocus(i, k)}
+              focusKey={focusKey}
             />
           ))
         )}

@@ -57,7 +57,9 @@ function usePanel(name: string) {
   return [open, setOpen] as const
 }
 
-type SheetState = { kind: "add"; day: DayKey } | { kind: "edit"; task: Task } | { kind: "settings" } | null
+type FocusRef = { kind: DayItem["kind"]; id: string; day: DayKey }
+
+type SheetState ={ kind: "add"; day: DayKey } | { kind: "edit"; task: Task } | { kind: "settings" } | null
 
 const iconBtn = "press grid size-10 shrink-0 place-items-center rounded-full text-ink-2"
 
@@ -81,6 +83,17 @@ export default function App() {
     if (task) setSheet({ kind: "edit", task })
   }
   const todayItems = itemsForDay(data, today)
+
+  // The item the Quick timer is focused on. Clicking any habit or task picks it.
+  const [focus, setFocus] = useState<FocusRef | null>(null)
+  const focused = focus ? itemsForDay(data, focus.day).find((i) => i.kind === focus.kind && i.id === focus.id) : undefined
+  const focusKey = focused && focus ? `${focus.day}:${focus.kind}:${focus.id}` : undefined
+  const pickFocus = (item: DayItem, day: DayKey) => {
+    setFocus({ kind: item.kind, id: item.id, day })
+    // Make sure the timer is on screen: open the left panel, or switch to the Focus tab on smaller screens.
+    if (window.matchMedia("(min-width: 1280px)").matches) setLeftOpen(true)
+    else setTab("focus")
+  }
 
   const themeBtn = (
     // Quick light / dark switch. "Follow the system" stays in Settings.
@@ -150,9 +163,20 @@ export default function App() {
           <h2 className="text-2xl font-semibold">Focus</h2>
         </div>
         <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-1">
-          <QuickTimer />
+          <QuickTimer
+            task={focused && focus ? { item: focused, day: focus.day, today } : undefined}
+            onToggleTask={() => focused && focus && toggle(focused, focus.day)}
+            onClearTask={() => setFocus(null)}
+          />
           {GROUPS.map((g) => (
-            <GroupCard key={g.id} group={g} items={todayItems.filter((i) => i.group.id === g.id)} onToggle={(i) => toggle(i, today)} />
+            <GroupCard
+              key={g.id}
+              group={g}
+              items={todayItems.filter((i) => i.group.id === g.id)}
+              onToggle={(i) => toggle(i, today)}
+              onFocus={(i) => pickFocus(i, today)}
+              focusedId={focus?.day === today && focused ? `${focus.kind}:${focus.id}` : undefined}
+            />
           ))}
         </div>
       </aside>
@@ -164,6 +188,8 @@ export default function App() {
           onToggle={toggle}
           onAdd={(day) => setSheet({ kind: "add", day })}
           onEdit={edit}
+          onFocus={pickFocus}
+          focusKey={focusKey}
           leading={
             <button
               onClick={() => setLeftOpen((o) => !o)}

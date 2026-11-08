@@ -47,7 +47,7 @@ export function WeekBoard({
     const el = scroller.current?.querySelector<HTMLElement>(`[data-day="${today}"]`)
     const sc = scroller.current
     if (!el || !sc) return
-    const left = sc.scrollLeft + el.getBoundingClientRect().left - sc.getBoundingClientRect().left - 16
+    const left = sc.scrollLeft + el.getBoundingClientRect().left - sc.getBoundingClientRect().left - parseFloat(getComputedStyle(sc).paddingLeft)
     sc.scrollTo({ left, behavior: scrollKey ? "smooth" : "auto" })
   }, [scrollKey, today, weekStart])
 
@@ -181,7 +181,7 @@ export function WeekBoard({
       {/* 768px+: seven columns side by side */}
       <div
         ref={scroller}
-        className="mt-5 hidden snap-x scroll-px-4 items-start gap-3 overflow-x-auto pb-3 md:flex xl:mt-0 xl:min-h-0 xl:flex-1 xl:overflow-auto xl:p-4"
+        className="mt-5 hidden snap-x scroll-px-4 xl:scroll-px-20 items-start gap-3 overflow-x-auto pb-3 md:flex xl:mt-0 xl:min-h-0 xl:flex-1 xl:overflow-auto xl:px-20 xl:py-4"
         style={{ scrollbarWidth: "thin" }}
       >
         {days.map((k) => (

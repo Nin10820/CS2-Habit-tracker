@@ -74,6 +74,10 @@ export type AppData = {
   tasks: Task[]
   /** Times changed on one day: day → card key → "HH:MM". The group's time is only the expected one. */
   times: Record<DayKey, Record<string, string>>
+  /** Card order you set by dragging: day → card keys, top to bottom. Days without one go by time. */
+  order: Record<DayKey, string[]>
+  /** Seconds the focus clock ran, per day. */
+  focus: Record<DayKey, number>
   /** Routine moments, the days the non-daily ones were added to, and the time each was logged (id → day → "HH:MM"). */
   routine: { items: RoutineItem[]; days: Record<DayKey, string[]>; log: Record<string, Record<DayKey, string>> }
 }

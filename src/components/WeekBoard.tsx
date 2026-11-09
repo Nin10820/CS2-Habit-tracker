@@ -1,12 +1,14 @@
 import { CalendarBlank, CaretDown, CaretLeft, CaretRight, Clock } from "@phosphor-icons/react"
 import { useEffect, useRef, useState, type ReactNode } from "react"
 import { useClock } from "../lib/clock"
+import { dragScroll } from "../lib/dragScroll"
 import { addDays, addMonths, dayOfMonth, formatDow, formatLong, formatMonthYear, formatWeekMonths, isoWeek, range, startOfWeek, weekOf, type DayKey } from "../lib/date"
 import { routineOn } from "../lib/routine"
 import { blocksForDay, itemsForDay } from "../lib/stats"
 import type { AppData, DayItem, RoutineItem } from "../lib/types"
 import { MonthGrid, WeekGrid, type OpenBlock } from "./CalendarViews"
-import { DayColumn, type CardDrag } from "./DayColumn"
+import { DayColumn, DayHead, TODAY_BG, type CardDrag } from "./DayColumn"
+import { WeekSummary } from "./WeekSummary"
 import { Ring } from "./ui"
 
 type View = "days" | "week" | "month"
@@ -53,8 +55,8 @@ export function WeekBoard({
   onRoutine,
   onDropRoutine,
   onDropCard,
+  onReorder,
   dayParts = false,
-  onSetTime,
   focusKey,
   leading,
   trailing,
@@ -74,9 +76,10 @@ export function WeekBoard({
   onDropRoutine: (id: string, day: DayKey) => void
   /** A card dragged from one day onto another. */
   onDropCard: (card: CardDrag, day: DayKey) => void
+  /** A day's card order after a drop (card keys, top to bottom). */
+  onReorder: (day: DayKey, keys: string[]) => void
   /** Split each day into Morning / Afternoon / Evening / Anytime (Settings). */
   dayParts?: boolean
-  onSetTime: (day: DayKey, key: string, time: string | null) => void
   focusKey?: string
   /** Extra controls at the start / end of the top bar (panel toggles, theme, settings). */
   leading?: ReactNode
@@ -176,7 +179,8 @@ export function WeekBoard({
           </button>
           <div
             aria-label={`Current time ${clock}`}
-            className="flex h-10 items-center gap-1.5 rounded-xl border border-line bg-surface px-3 text-sm font-semibold text-ink tabular-nums xl:@max-4xl:hidden"
+            // In the 7-day view (768px+) the clock lives in the week summary instead.
+            className={`flex h-10 items-center gap-1.5 rounded-xl border border-line bg-surface px-3 text-sm font-semibold text-ink tabular-nums xl:@max-4xl:hidden ${view === "days" ? "md:hidden" : ""}`}
           >
             <Clock size={18} className="text-ink-2" /> {clock}
           </div>
@@ -217,12 +221,9 @@ export function WeekBoard({
         </div>
         <DayColumn
           className="mt-4"
-          showHeader={false}
-          now={clock}
-          day={day}
+          showHeader={false}          day={day}
           today={today}
           blocks={blocksForDay(data, day)}
-          onSetTime={(key, t) => onSetTime(day, key, t)}
           onToggle={(i) => onToggle(i, day)}
           onAdd={() => onAdd(day)}
           onEdit={onEdit}
@@ -233,6 +234,7 @@ export function WeekBoard({
           onRoutine={(i) => onRoutine(i, day)}
           onDropRoutine={(id) => onDropRoutine(id, day)}
           onDropCard={(c) => onDropCard(c, day)}
+          onReorder={(keys) => onReorder(day, keys)}
           dayParts={dayParts}
           focusKey={focusKey}
         />
@@ -240,19 +242,41 @@ export function WeekBoard({
 
       {/* 768px+: 7 day columns of cards (scrolling sideways), or the Week / Month calendar */}
       {view === "days" ? (
+        <>
+        {/* One top section: the week summary (stays put), then the day heads band (scrolls sideways with the columns). */}
+        {/* Set apart from the day heads below by a line. */}
+        <div className="mt-5 hidden md:block xl:mt-0">
+          <WeekSummary data={data} today={today} anchor={anchor} clock={clock} />
+        </div>
         <div
           ref={scroller}
-          className="mt-5 hidden snap-x scroll-px-4 items-stretch gap-6 overflow-x-auto pb-3 md:flex xl:mt-0 xl:min-h-0 xl:flex-1 xl:overflow-auto xl:px-4 xl:pt-0 xl:pb-[calc(var(--player-space)+16px)]"
+          {...dragScroll()}
+          className="hidden cursor-grab snap-x scroll-px-4 overflow-x-auto pb-3 md:block xl:min-h-0 xl:flex-1 xl:overflow-auto xl:pb-0"
         >
+          {/* One width for both rows (at least 296px a day), so each head sits right above its column. */}
+          <div className="flex min-h-full flex-col" style={{ width: `max(100%, ${cardDays.length * 296 + (cardDays.length - 1) * 24 + 32}px)` }}>
+          {/* All the day heads as one band, pinned while the cards scroll: date, done count, routine. */}
+          <div className="z-20 flex gap-6 border-b border-line bg-surface px-4 shadow-[0_6px_12px_-10px_rgb(0_0_0/0.25)] xl:sticky xl:top-0">
+            {cardDays.map((k) => (
+              <div
+                key={k}
+                style={k === today ? { background: TODAY_BG } : undefined}
+                className="flex min-w-0 flex-1 basis-0 flex-col gap-2 px-2 pt-2 pb-3"
+              >
+                <DayHead day={k} today={today} blocks={blocksForDay(data, k)} routine={routineFor(k)} onRoutine={(i) => onRoutine(i, k)} />
+              </div>
+            ))}
+          </div>
+          <div className="flex flex-1 gap-6 px-4">
           {cardDays.map((k) => (
             <DayColumn
               key={k}
-              className="min-w-[296px] flex-1 snap-start"
-              now={clock}
-              day={k}
+              head={false}
+              // Columns are as tall as the tallest (or the board) and hold the space kept clear for
+              // the player, so today's tint runs to the very bottom.
+              className="min-w-0 flex-1 basis-0 snap-start xl:pb-[calc(var(--player-space)+16px)]"              day={k}
               today={today}
               blocks={blocksForDay(data, k)}
-              onSetTime={(key, t) => onSetTime(k, key, t)}
               onToggle={(i) => onToggle(i, k)}
               onAdd={() => onAdd(k)}
               onEdit={onEdit}
@@ -263,11 +287,15 @@ export function WeekBoard({
               onRoutine={(i) => onRoutine(i, k)}
               onDropRoutine={(id) => onDropRoutine(id, k)}
               onDropCard={(c) => onDropCard(c, k)}
+              onReorder={(keys) => onReorder(k, keys)}
               dayParts={dayParts}
               focusKey={focusKey}
             />
           ))}
+          </div>
+          </div>
         </div>
+        </>
       ) : (
         <div className="mt-5 hidden overflow-x-auto md:flex xl:mt-0 xl:min-h-0 xl:flex-1">
           {view === "week" ? (

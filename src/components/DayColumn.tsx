@@ -1,5 +1,6 @@
-import { ArrowCounterClockwise, Check, Clock, DotsThree, Moon, PencilSimple, Plus, Sun, SunHorizon } from "@phosphor-icons/react"
-import { Fragment, useState, type DragEvent, type KeyboardEvent } from "react"
+import { Check, Clock, DotsThree, Moon, PencilSimple, Plus, Sun, SunHorizon } from "@phosphor-icons/react"
+import { Fragment, useLayoutEffect, useRef, useState, type DragEvent, type KeyboardEvent, type ReactElement, type RefObject } from "react"
+import { getCardDrag, setCardDrag, setDropSlot, useCardDrag } from "../lib/cardDrag"
 import { dayOfMonth, formatDow, type DayKey } from "../lib/date"
 import { colorVar, type DayBlock, type DayItem, type RoutineItem } from "../lib/types"
 import { dayPart, type DayPart } from "../lib/prefs"
@@ -10,7 +11,7 @@ export const CARD_DRAG = "application/x-day-card"
 export type CardDrag = { from: DayKey; kind: "group" | "task"; id: string }
 
 /** Today's column tint: opaque, so the pinned heading can use it too and hide the cards scrolling under. */
-const TODAY_BG = "color-mix(in oklab, var(--accent) 6%, var(--bg))"
+export const TODAY_BG ="color-mix(in oklab, var(--accent) 3.5%, var(--bg))"
 
 /**
  * Props for a clickable title inside a draggable card. Chrome won't start a drag from a <button>,
@@ -28,19 +29,66 @@ const pressable = (onPress: () => void) => ({
   },
 })
 
-/** Makes a card draggable to another day; it fades while it's being dragged. */
-function cardDrag(data: CardDrag) {
+/**
+ * Makes a card draggable within its day or to another day. Once the browser has its drag picture,
+ * the card leaves its list (hidden, not removed: Chrome drops `dragend` for removed sources).
+ */
+function cardDrag(data: CardDrag, key: string) {
   return {
     draggable: true,
     onDragStart: (e: DragEvent<HTMLElement>) => {
       e.dataTransfer.setData(CARD_DRAG, JSON.stringify(data))
       e.dataTransfer.effectAllowed = "move"
-      e.currentTarget.style.opacity = "0.45"
+      setCardDrag({ key, from: data.from, height: e.currentTarget.offsetHeight, lifted: false })
+      setTimeout(() => setCardDrag((s) => (s && s.key === key ? { ...s, lifted: true } : s)))
     },
-    onDragEnd: (e: DragEvent<HTMLElement>) => {
-      e.currentTarget.style.opacity = ""
-    },
+    onDragEnd: () => setCardDrag(null),
   }
+}
+
+/** How a card looks during a drag: the dragged one is out of the list, the rest dim. */
+type DragLook = "lifted" | "dim" | undefined
+
+/** Props for a card's <li>: its key (for the drop position and slide animation) and its drag look. */
+const cardLi = (key: string, look: DragLook) => ({
+  "data-key": key,
+  "data-lifted": look === "lifted" || undefined,
+  hidden: look === "lifted",
+})
+
+/** Grab cursor on draggable cards; the others fade (with a slight shrink) while a card is dragged. */
+const dragClass = (drag: unknown, look: DragLook) =>
+  `transition-[opacity,scale] duration-200 ${drag ? "cursor-grab select-none active:cursor-grabbing" : ""} ${look === "dim" ? "scale-[0.985] opacity-45" : ""}`
+
+/** Where the dragged card will land: a dashed frame the size of the card. */
+function DropSlot({ height }: { height: number }) {
+  return <li aria-hidden className="drop-slot rounded-2xl border-2 border-dashed border-accent bg-accent/5" style={{ height }} />
+}
+
+/**
+ * Slide cards to their new place when the list changes (FLIP): remember each card's offset, and
+ * after a re-render play the move from the old offset. offsetTop ignores running transforms.
+ */
+function useSlide(list: RefObject<HTMLUListElement | null>) {
+  const prev = useRef(new Map<string, number>())
+  useLayoutEffect(() => {
+    const ul = list.current
+    if (!ul) return
+    const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches
+    const next = new Map<string, number>()
+    for (const li of ul.querySelectorAll<HTMLElement>(":scope > li[data-key]:not([hidden])")) {
+      const key = li.dataset.key!
+      const was = prev.current.get(key)
+      next.set(key, li.offsetTop)
+      if (!reduce && was !== undefined && Math.abs(was - li.offsetTop) > 1) {
+        li.animate([{ transform: `translateY(${was - li.offsetTop}px)` }, { transform: "none" }], {
+          duration: 260,
+          easing: "cubic-bezier(0.2, 0.8, 0.2, 1)",
+        })
+      }
+    }
+    prev.current = next
+  })
 }
 
 type ItemHandlers = {
@@ -65,13 +113,15 @@ export function DayColumn({
   onRoutine,
   onDropRoutine,
   onDropCard,
-  onSetTime,
+  onReorder,
   focusKey,
   className = "",
-  now,
   showHeader = true,
+  head = true,
   dayParts = false,
 }: ItemHandlers & {
+  /** Draw the pinned head (date + routine) in the column. The 7-day board draws them as one band instead. */
+  head?: boolean
   /** Split the cards into Morning / Afternoon / Evening / Anytime with a divider line (Settings). */
   dayParts?: boolean
   /** The weekday / date heading. Phones leave it out: their day strip above already shows it. */
@@ -90,21 +140,14 @@ export function DayColumn({
   onDropRoutine?: (id: string) => void
   /** A card dragged here from another day. */
   onDropCard?: (card: CardDrag) => void
-  /** Change a card's time for this day; null goes back to the expected time. */
-  onSetTime: (key: string, time: string | null) => void
+  /** The day's card keys, top to bottom, after a card was dropped into this day. */
+  onReorder?: (keys: string[]) => void
   /** "day:kind:id" of the focused item, to highlight it. */
   focusKey?: string
   className?: string
-  /** Current "HH:MM". When given and this is today, a "Now" line sits between past and upcoming cards. */
-  now?: string
 }) {
   const isToday = day === today
   const future = day > today
-  const items = blocks.flatMap((b) => (b.kind === "group" ? b.items : [b.item]))
-  const done = items.filter((i) => i.done).length
-  // Untimed cards sort last, so they fall after the line.
-  const nowAt = now && isToday ? blocks.findIndex((b) => (b.time ?? "99:99") > now) : -2
-  const marker = nowAt === -2 ? -1 : nowAt === -1 ? blocks.length : nowAt
   const handlers: ItemHandlers = { onToggle, onEdit, onFocus }
   // Highlight while a routine moment or another day's card is dragged over this day.
   const [dropping, setDropping] = useState(false)
@@ -112,22 +155,49 @@ export function DayColumn({
   const isCard = (e: DragEvent<HTMLElement>) => e.dataTransfer.types.includes(CARD_DRAG)
   const isFocused = (i: DayItem) => focusKey === `${day}:${i.kind}:${i.id}`
 
+  // Card drag: the lifted card is out of its list, the others dim, and a slot shows where it lands.
+  const drag = useCardDrag()
+  const list = useRef<HTMLUListElement>(null)
+  useSlide(list)
+  // A group's card has the same key on every day, so the lifted one is the key on the day it left.
+  const lookOf = (key: string): DragLook => (!drag?.lifted ? undefined : key === drag.key && day === drag.from ? "lifted" : "dim")
+  const slotAt = drag?.lifted && drag.over?.day === day ? drag.over.index : -1
+  const visibleCount = blocks.filter((b) => lookOf(b.key) !== "lifted").length
+  /** Slot index under the pointer: before the first card whose middle is below it. */
+  const slotIndexAt = (y: number) => {
+    const ul = list.current
+    if (!ul) return 0
+    const top = ul.getBoundingClientRect().top
+    const lis = [...ul.querySelectorAll<HTMLElement>(":scope > li[data-key]:not([hidden])")]
+    const i = lis.findIndex((li) => y < top + li.offsetTop + li.offsetHeight / 2)
+    return i === -1 ? lis.length : i
+  }
+  // Rendering: walk the cards, counting the visible ones, and put the slot before visible card n.
+  let visibleIdx = 0
+  const slotBefore = (b: DayBlock): ReactElement | null => {
+    if (lookOf(b.key) === "lifted") return null
+    return visibleIdx++ === slotAt ? <DropSlot height={drag!.height} /> : null
+  }
+
   return (
     <section
       data-day={day}
       aria-label={`${formatDow(day)} ${dayOfMonth(day)}`}
       style={isToday ? { background: TODAY_BG } : undefined}
-      className={`@container flex flex-col gap-2 rounded-[22px] px-2 pb-2 transition-shadow ${dropping ? "ring-2 ring-accent" : ""} ${className}`}
+      className={`@container flex flex-col gap-2 px-2 pb-2 transition-shadow ${dropping ? "ring-2 ring-accent" : ""} ${className}`}
       onDragOver={(e) => {
         const routine = !!onDropRoutine && isRoutine(e)
         const card = !!onDropCard && isCard(e)
         if (!routine && !card) return
         e.preventDefault()
         e.dataTransfer.dropEffect = card ? "move" : "copy"
-        setDropping(true)
+        if (card) setDropSlot(day, slotIndexAt(e.clientY))
+        else setDropping(true)
       }}
       onDragLeave={(e) => {
-        if (!e.currentTarget.contains(e.relatedTarget as Node | null)) setDropping(false)
+        if (e.currentTarget.contains(e.relatedTarget as Node | null)) return
+        setDropping(false)
+        if (getCardDrag()?.over?.day === day) setDropSlot(undefined)
       }}
       onDrop={(e) => {
         setDropping(false)
@@ -142,18 +212,107 @@ export function DayColumn({
           e.preventDefault()
           try {
             const card = JSON.parse(raw) as CardDrag
+            const s = getCardDrag()
+            // The day's new order: the other cards as shown, with the dropped one where the slot was.
+            const keys = blocks.map((b) => b.key).filter((k) => k !== s?.key)
+            if (s) keys.splice(s.over?.day === day ? Math.min(s.over.index, keys.length) : keys.length, 0, s.key)
             if (card.from !== day) onDropCard(card)
+            onReorder?.(keys)
           } catch {
             /* not ours */
           }
+          setCardDrag(null)
         }
       }}
     >
-      {/* Pinned while the cards scroll: the day heading and the routine buttons (today's in its tint). */}
-      <div
-        style={isToday ? { background: TODAY_BG } : undefined}
-        className={`sticky top-14 z-20 -mx-2 flex flex-col gap-2 rounded-t-[22px] px-2 pt-3 pb-2 xl:top-0 ${isToday ? "" : "bg-bg"}`}
+      {/* Pinned while the cards scroll: the day heading and the routine buttons (today's in its tint).
+          The 7-day board leaves it out and draws all the heads as one band (DayHead). */}
+      {head && (
+        <div
+          style={isToday ? { background: TODAY_BG } : undefined}
+          className={`sticky top-14 z-20 -mx-2 flex flex-col gap-2 px-2 pt-3 pb-2 xl:top-0 ${isToday ? "" : "bg-bg"}`}
+        >
+          <DayHead day={day} today={today} blocks={blocks} routine={routine} onRoutine={onRoutine} showHeader={showHeader} />
+        </div>
+      )}
+      {!head && <div className="h-1" aria-hidden />}
+
+      <button
+        onClick={onAdd}
+        className="press flex h-10 items-center justify-center gap-1.5 rounded-xl bg-surface-2 text-sm font-medium text-ink-2"
       >
+        <Plus size={16} weight="bold" /> Add
+      </button>
+
+      {blocks.length === 0 && <p className="px-1 py-3 text-center text-xs text-ink-3">Nothing planned.</p>}
+
+      <ul ref={list} className="relative flex flex-col gap-4">
+        {blocks.map((b, idx) => (
+          <Fragment key={b.key}>
+            {dayParts && (idx === 0 || dayPart(blocks[idx - 1].time) !== dayPart(b.time)) && <PartDivider part={dayPart(b.time)} />}
+            {slotBefore(b)}
+            {b.kind === "group" ? (
+              <GroupBlock
+                block={b}
+                future={future}
+                look={lookOf(b.key)}
+                isFocused={isFocused}
+                groupFocused={focusKey === `${day}:group:${b.group.id}`}
+                onFocusGroup={() => onFocusGroup(b.group.id)}
+                onMenu={() => onGroupMenu(b.group.id)}
+                drag={onDropCard ? cardDrag({ from: day, kind: "group", id: b.group.id }, b.key) : undefined}
+                {...handlers}
+              />
+            ) : (
+              <SingleBlock
+                block={b}
+                future={future}
+                look={lookOf(b.key)}
+                focused={isFocused(b.item)}
+                drag={
+                  onDropCard
+                    ? cardDrag(
+                        b.item.kind === "task" ? { from: day, kind: "task", id: b.item.id } : { from: day, kind: "group", id: b.item.group.id },
+                        b.key,
+                      )
+                    : undefined
+                }
+                {...handlers}
+              />
+            )}
+          </Fragment>
+        ))}
+        {slotAt >= visibleCount && <DropSlot height={drag!.height} />}
+      </ul>
+    </section>
+  )
+}
+
+/**
+ * A day's head: weekday and date (today in a soft box), done count, then the routine buttons.
+ */
+export function DayHead({
+  day,
+  today,
+  blocks,
+  routine = [],
+  onRoutine,
+  showHeader = true,
+}: {
+  day: DayKey
+  today: DayKey
+  blocks: DayBlock[]
+  routine?: { item: RoutineItem; time?: string }[]
+  onRoutine?: (item: RoutineItem) => void
+  showHeader?: boolean
+}) {
+  const isToday = day === today
+  const future = day > today
+  const items = blocks.flatMap((b) => (b.kind === "group" ? b.items : [b.item]))
+  const done = items.filter((i) => i.done).length
+
+  return (
+    <>
       {showHeader && (
       <header className="flex flex-col items-center pb-1">
         {/* Today sits in a soft box. */}
@@ -185,7 +344,7 @@ export function DayColumn({
                 aria-label={time ? `${item.name} at ${time}` : `Log ${item.name}`}
                 style={{ ["--hc" as string]: colorVar(color) }}
                 className={`press flex h-11 min-w-0 flex-1 items-center justify-center gap-1.5 rounded-xl px-2 text-sm font-medium disabled:opacity-40 ${
-                  time ? "hc-soft hc-text" : "border-[1.5px] border-dashed border-[color-mix(in_oklab,var(--hc)_40%,transparent)] text-ink-2"
+                  time ? "hc-soft hc-text" : "border-[1.5px] border-dashed border-[color-mix(in_oklab,var(--hc)_40%,transparent)] bg-surface text-ink-2"
                 }`}
               >
                 <Icon size={18} weight={time ? "fill" : "regular"} className="hc-text shrink-0" />
@@ -198,53 +357,7 @@ export function DayColumn({
           })}
         </div>
       )}
-      </div>
-
-      <button
-        onClick={onAdd}
-        className="press flex h-10 items-center justify-center gap-1.5 rounded-xl bg-surface-2 text-sm font-medium text-ink-2"
-      >
-        <Plus size={16} weight="bold" /> Add
-      </button>
-
-      {blocks.length === 0 && <p className="px-1 py-3 text-center text-xs text-ink-3">Nothing planned.</p>}
-
-      <ul className="flex flex-col gap-4">
-        {blocks.map((b, idx) => (
-          <Fragment key={b.key}>
-            {idx === marker && <NowMarker time={now!} />}
-            {dayParts && (idx === 0 || dayPart(blocks[idx - 1].time) !== dayPart(b.time)) && <PartDivider part={dayPart(b.time)} />}
-            {b.kind === "group" ? (
-              <GroupBlock
-                block={b}
-                future={future}
-                isFocused={isFocused}
-                groupFocused={focusKey === `${day}:group:${b.group.id}`}
-                onFocusGroup={() => onFocusGroup(b.group.id)}
-                onMenu={() => onGroupMenu(b.group.id)}
-                drag={onDropCard ? cardDrag({ from: day, kind: "group", id: b.group.id }) : undefined}
-                onSetTime={(t) => onSetTime(b.key, t)}
-                {...handlers}
-              />
-            ) : (
-              <SingleBlock
-                block={b}
-                future={future}
-                focused={isFocused(b.item)}
-                onSetTime={(t) => onSetTime(b.key, t)}
-                drag={
-                  onDropCard
-                    ? cardDrag(b.item.kind === "task" ? { from: day, kind: "task", id: b.item.id } : { from: day, kind: "group", id: b.item.group.id })
-                    : undefined
-                }
-                {...handlers}
-              />
-            )}
-          </Fragment>
-        ))}
-        {marker === blocks.length && blocks.length > 0 && <NowMarker time={now!} />}
-      </ul>
-    </section>
+    </>
   )
 }
 
@@ -264,62 +377,6 @@ function PartDivider({ part }: { part: DayPart }) {
       {label}
       <span className="h-px flex-1 bg-line" aria-hidden />
     </li>
-  )
-}
-
-/** Thin line with the current time, between what's past and what's next. */
-function NowMarker({ time }: { time: string }) {
-  return (
-    <li aria-label={`Now, ${time}`} className="flex items-center gap-2 py-0.5">
-      <span className="rounded-full bg-accent px-2 py-0.5 text-[11px] font-semibold text-on-accent tabular-nums">Now · {time}</span>
-      <span className="h-0.5 flex-1 rounded-full bg-accent" aria-hidden />
-    </li>
-  )
-}
-
-const chip = "rounded-md px-1.5 py-0.5 text-xs font-medium tabular-nums whitespace-nowrap"
-
-/**
- * The card's time. It's only the expected time: click to change it for this day.
- * When changed, ↺ goes back to the expected one.
- */
-function TimeChip({ time, expected, onChange }: { time?: string; expected?: string; onChange: (t: string | null) => void }) {
-  const changed = !!time && time !== expected
-  return (
-    <span className="inline-flex shrink-0 items-center gap-0.5">
-      {/* The chip shows 24-hour text; an invisible time field on top opens the browser's picker
-          (the field's own display follows the OS locale, often 12-hour). */}
-      <span
-        title={changed ? `Changed for this day · expected ${expected}` : "Expected time · click to change"}
-        className={`relative bg-surface/80 ${chip} text-ink focus-within:ring-2 focus-within:ring-accent ${changed ? "ring-1 ring-current" : ""}`}
-      >
-        {time ?? "--:--"}
-        <input
-          type="time"
-          value={time ?? ""}
-          onChange={(e) => onChange(e.target.value && e.target.value !== expected ? e.target.value : null)}
-          onClick={(e) => {
-            try {
-              e.currentTarget.showPicker()
-            } catch {
-              /* older browsers: typing still works */
-            }
-          }}
-          aria-label={expected ? `Time, expected ${expected}` : "Time"}
-          className="absolute inset-0 h-full w-full cursor-pointer opacity-0"
-        />
-      </span>
-      {changed && (
-        <button
-          onClick={() => onChange(null)}
-          aria-label={`Back to expected time ${expected ?? ""}`}
-          title={`Back to ${expected ?? "no time"}`}
-          className="press grid size-6 place-items-center rounded-full text-ink-3"
-        >
-          <ArrowCounterClockwise size={13} weight="bold" />
-        </button>
-      )}
-    </span>
   )
 }
 
@@ -364,7 +421,7 @@ function ItemRow({
 }) {
   const Icon = item.group.icon
   return (
-    <li className={`flex items-center gap-3 px-3.5 py-3.5 ${focused ? "ring-2 ring-accent ring-inset" : ""}`}>
+    <li className={`flex items-center gap-3 px-3.5 py-3.5 ${focused ? "bg-[color-mix(in_oklab,var(--accent)_8%,var(--surface))] shadow-[inset_3px_0_0_var(--accent)]" : ""}`}>
       <span className="hc-soft grid size-7 shrink-0 place-items-center rounded-full" aria-hidden>
         <Icon size={14} className="hc-text" />
       </span>
@@ -390,7 +447,9 @@ function ItemRow({
 /** Card frame: a band in the group's soft color (icon, NAME (count), time, actions), then the rows. */
 const cardFrame = (focused: boolean) =>
   `overflow-hidden rounded-2xl border bg-surface ${focused ? "border-accent" : "border-card-line"}`
-const bandLabel = "min-w-0 truncate text-xs font-medium tracking-[0.6px] text-ink uppercase"
+const bandLabel = "hc-ink min-w-0 truncate text-[13px] font-semibold"
+/** "tiếng anh" → "Tiếng anh": first letter capital, the rest as typed. */
+const capFirst = (s: string) => s.charAt(0).toLocaleUpperCase("vi") + s.slice(1)
 
 /** A group's card: band with the group's name and done/total, then its items as rows. */
 function GroupBlock({
@@ -401,7 +460,7 @@ function GroupBlock({
   onFocusGroup,
   onMenu,
   drag,
-  onSetTime,
+  look,
   onToggle,
   onEdit,
   onFocus,
@@ -409,12 +468,12 @@ function GroupBlock({
   block: Extract<DayBlock, { kind: "group" }>
   /** Drag handlers to move the card to another day. */
   drag?: ReturnType<typeof cardDrag>
+  look?: DragLook
   future: boolean
   isFocused: (i: DayItem) => boolean
   groupFocused: boolean
   onFocusGroup: () => void
   onMenu: () => void
-  onSetTime: (t: string | null) => void
 }) {
   const { group, items } = block
   const Icon = group.icon
@@ -422,7 +481,7 @@ function GroupBlock({
   const done = items.filter((i) => i.done).length
 
   return (
-    <li style={{ ["--hc" as string]: colorVar(group.color) }} className={`${cardFrame(groupFocused)} ${drag ? "cursor-grab select-none active:cursor-grabbing" : ""}`} {...drag}>
+    <li {...cardLi(block.key, look)} style={{ ["--hc" as string]: colorVar(group.color) }} className={`${cardFrame(groupFocused)} ${dragClass(drag, look)}`} {...drag}>
       <div className="hc-soft flex items-center gap-1.5 py-2.5 pr-1.5 pl-3.5">
         <div
           {...pressable(onFocusGroup)}
@@ -431,12 +490,11 @@ function GroupBlock({
           className="flex min-w-0 flex-1 cursor-pointer items-center gap-2 text-left outline-none focus-visible:ring-2 focus-visible:ring-accent"
         >
           <Icon size={15} className="hc-text shrink-0" aria-hidden />
-          <span className={bandLabel}>{group.label}</span>
+          <span className={bandLabel}>{capFirst(group.label)}</span>
           <span className="-ml-0.5 shrink-0 text-xs text-ink-2 tabular-nums">
             ({done}/{items.length})
           </span>
         </div>
-        <TimeChip time={block.time} expected={block.expected} onChange={onSetTime} />
         <button onClick={onMenu} aria-label={`${group.label} options`} title="Group options" className="press -ml-1 grid size-6 shrink-0 place-items-center rounded-full text-ink-2">
           <DotsThree size={16} weight="bold" />
         </button>
@@ -471,26 +529,25 @@ function SingleBlock({
   future,
   focused,
   drag,
-  onSetTime,
+  look,
   onToggle,
   onEdit,
   onFocus,
 }: ItemHandlers & {
   block: Extract<DayBlock, { kind: "single" }>
   drag?: ReturnType<typeof cardDrag>
+  look?: DragLook
   future: boolean
   focused: boolean
-  onSetTime: (t: string | null) => void
 }) {
   const { item } = block
   const Icon = item.group.icon
 
   return (
-    <li style={{ ["--hc" as string]: colorVar(item.group.color) }} className={`${cardFrame(focused)} ${drag ? "cursor-grab select-none active:cursor-grabbing" : ""}`} {...drag}>
+    <li {...cardLi(block.key, look)} style={{ ["--hc" as string]: colorVar(item.group.color) }} className={`${cardFrame(focused)} ${dragClass(drag, look)}`} {...drag}>
       <div className="hc-soft flex items-center gap-2 py-2.5 pr-2.5 pl-3.5">
         <Icon size={15} className="hc-text shrink-0" aria-hidden />
-        <span className={`${bandLabel} flex-1`}>{item.group.label}</span>
-        <TimeChip time={block.time} expected={block.expected} onChange={onSetTime} />
+        <span className={`${bandLabel} flex-1`}>{capFirst(item.group.label)}</span>
       </div>
       <ul>
         <ItemRow item={item} future={future} focused={false} onToggle={() => onToggle(item)} onEdit={() => onEdit(item)} onFocus={() => onFocus(item)} />

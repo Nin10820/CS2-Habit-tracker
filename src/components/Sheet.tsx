@@ -12,6 +12,7 @@ export function Sheet({
   children,
   wide = false,
   page = false,
+  roomy = false,
   header,
 }: {
   title: string
@@ -19,6 +20,8 @@ export function Sheet({
   children: ReactNode
   wide?: boolean
   page?: boolean
+  /** A form dialog with a bit more width (e.g. rows that hold a time picker). */
+  roomy?: boolean
   header?: ReactNode
 }) {
   if (page) wide = true
@@ -53,7 +56,7 @@ export function Sheet({
         className={`sheet-in relative w-full rounded-t-3xl bg-surface shadow-card outline-none sm:rounded-3xl ${page ? "overflow-hidden" : ""} ${
           wide
             ? "flex max-h-[92dvh] max-w-3xl flex-col sm:max-h-[88dvh]"
-            : "max-w-md px-5 pt-5 pb-[max(20px,env(safe-area-inset-bottom))] sm:pb-5"
+            : `${roomy ? "max-w-lg" : "max-w-md"} px-5 pt-5 pb-[max(20px,env(safe-area-inset-bottom))] sm:pb-5`
         }`}
       >
         {page ? (

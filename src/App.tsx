@@ -206,7 +206,7 @@ export default function App() {
     onPickSub: (i: DayItem) => focus && pickFocus(i, focus.day),
     onPickGroup: backToGroup,
   }
-  const timer = useFocusTimer(focusTask)
+  const timer = useFocusTimer(focusTask, (s) => store.addFocus(todayKey(), s))
 
   // The player bar shows whenever a task is picked, or for a Quick focus session without a task.
   const [quick, setQuick] = useState(false)
@@ -353,8 +353,8 @@ export default function App() {
           onRoutine={logRoutine}
           onDropRoutine={(id, day) => store.setRoutineOnDay(id, day, true)}
           onDropCard={(c, day) => (c.kind === "task" ? store.updateTask(c.id, { day }) : store.moveGroup(c.id, c.from, day))}
+          onReorder={store.setOrder}
           dayParts={dayParts}
-          onSetTime={store.setTime}
           focusKey={focusKey}
           leading={
             <button

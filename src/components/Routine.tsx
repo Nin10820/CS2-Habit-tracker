@@ -4,7 +4,7 @@ import { formatLong, type DayKey } from "../lib/date"
 import { newId } from "../lib/store"
 import type { AppData, RoutineItem } from "../lib/types"
 import { Sheet } from "./Sheet"
-import { DashedEmpty, listRow, PillHeader, pillAction } from "./ui"
+import { DashedEmpty, listRow, PillHeader, pillAction, TimeField } from "./ui"
 
 const field = "h-11 w-full rounded-xl border border-line bg-bg px-3 text-base text-ink outline-none placeholder:text-ink-3 focus:border-accent"
 export const RoutineIcon = ({ item, size = 18 }: { item: RoutineItem; size?: number }) =>
@@ -181,7 +181,7 @@ export function RoutineLogSheet({
   const title = auto ? (morning ? "Good morning" : evening ? "Time for bed?" : "Routine") : entries.length === 1 ? entries[0].item.name : "Routine"
 
   return (
-    <Sheet title={title} onClose={onClose}>
+    <Sheet title={title} onClose={onClose} roomy>
       <form
         onSubmit={(e) => {
           e.preventDefault()
@@ -203,12 +203,11 @@ export function RoutineLogSheet({
                 </span>
               </label>
               {!future && (
-              <input
+              <TimeField
                 id={`rt-${en.item.id}`}
-                type="time"
+                label={`${en.item.name} time`}
                 value={times[i]}
-                onChange={(e) => setTimes((ts) => ts.map((t, j) => (j === i ? e.target.value : t)))}
-                className="h-11 w-[116px] shrink-0 rounded-xl border border-line bg-bg px-2 text-center font-title text-lg font-semibold text-ink tabular-nums outline-none focus:border-accent"
+                onChange={(v) => setTimes((ts) => ts.map((t, j) => (j === i ? v : t)))}
               />
               )}
             </div>

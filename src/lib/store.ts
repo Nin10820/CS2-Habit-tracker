@@ -31,6 +31,8 @@ export const defaultData = (): AppData => {
     checks: {},
     tasks: [],
     times: {},
+    order: {},
+    focus: {},
     routine: { items: structuredClone(DEFAULT_ROUTINE), days: {}, log: {} },
   }
 }
@@ -159,6 +161,18 @@ export function parseData(input: unknown): AppData {
     }
   }
 
+  const order: AppData["order"] = {}
+  for (const [day, keys] of Object.entries((obj.order ?? {}) as Record<string, unknown>)) {
+    if (!dayRe.test(day) || !Array.isArray(keys)) continue
+    const ok = [...new Set(keys.filter((k): k is string => typeof k === "string" && k.length <= 200))]
+    if (ok.length) order[day] = ok
+  }
+
+  const focus: AppData["focus"] = {}
+  for (const [day, s] of Object.entries((obj.focus ?? {}) as Record<string, unknown>)) {
+    if (dayRe.test(day) && typeof s === "number" && s > 0) focus[day] = Math.min(86_400, Math.round(s))
+  }
+
   // Routine moments. Data from before them gets the defaults, and "Dậy sớm" leaves the old Routine
   // group (waking up is logged as a Routine moment now); that group keeps Planning.
   const r = obj.routine && typeof obj.routine === "object" ? (obj.routine as Record<string, unknown>) : undefined
@@ -199,7 +213,7 @@ export function parseData(input: unknown): AppData {
     }
   }
 
-  return { version: 3, startedAt, groups, plans, checks, tasks, times, routine: { items, days: routineDays, log } }
+  return { version: 3, startedAt, groups, plans, checks, tasks, times, order, focus, routine: { items, days: routineDays, log } }
 }
 
 export const newId = () =>
@@ -256,6 +270,17 @@ export function useStore() {
       if (!Object.keys(dayTimes).length) delete times[day]
       return { ...d, times }
     })
+  }, [])
+
+  /** Save a day's card order (card keys, top to bottom), set by dragging. */
+  const setOrder = useCallback((day: DayKey, keys: string[]) => {
+    setData((d) => ({ ...d, order: { ...d.order, [day]: keys } }))
+  }, [])
+
+  /** Add focus-clock time (seconds) to a day. */
+  const addFocus = useCallback((day: DayKey, seconds: number) => {
+    if (seconds <= 0) return
+    setData((d) => ({ ...d, focus: { ...d.focus, [day]: Math.min(86_400, (d.focus[day] ?? 0) + seconds) } }))
   }, [])
 
   const replaceAll = useCallback((next: AppData) => setData(next), [])
@@ -376,6 +401,8 @@ export function useStore() {
     toggleTask,
     deleteTask,
     setTime,
+    setOrder,
+    addFocus,
     replaceAll,
     saveGroup,
     deleteGroup,

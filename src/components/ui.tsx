@@ -1,5 +1,94 @@
 import { CaretUp, Plus } from "@phosphor-icons/react"
-import type { ReactNode } from "react"
+import { useRef, useState, type KeyboardEvent, type ReactNode } from "react"
+
+const pad2 = (n: number) => String(n).padStart(2, "0")
+
+/**
+ * A time picker made of two number fields, hour (1–12) and minute (00–59), plus a quiet AM/PM
+ * switch. `value` and `onChange` use 24-hour "HH:MM". ↑/↓ step a field; typing the hour moves on to
+ * the minutes. Unlike the browser's time field, it never cuts off and reads the same everywhere.
+ */
+export function TimeField({ id, value, onChange, label = "Time" }: { id?: string; value: string; onChange: (v: string) => void; label?: string }) {
+  const set = /^\d\d:\d\d$/.test(value)
+  const h24 = set ? Number(value.slice(0, 2)) : 0
+  const min = set ? Number(value.slice(3, 5)) : 0
+  const pm = set && h24 >= 12
+  const h12 = h24 % 12 || 12
+  // What's typed while a field has focus; null shows the value.
+  const [hText, setHText] = useState<string | null>(null)
+  const [mText, setMText] = useState<string | null>(null)
+  const minutes = useRef<HTMLInputElement>(null)
+
+  const emit = (h: number, m: number, isPm: boolean) => onChange(`${pad2((h % 12) + (isPm ? 12 : 0))}:${pad2(m)}`)
+  const wrap = (n: number, lo: number, hi: number) => (n < lo ? hi : n > hi ? lo : n)
+  const step = (e: KeyboardEvent<HTMLInputElement>, field: "h" | "m") => {
+    if (e.key !== "ArrowUp" && e.key !== "ArrowDown") return
+    e.preventDefault()
+    const d = e.key === "ArrowUp" ? 1 : -1
+    if (field === "h") {
+      setHText(null)
+      emit(wrap(h12 + d, 1, 12), min, pm)
+    } else {
+      setMText(null)
+      emit(h12, wrap(min + d * (e.shiftKey ? 10 : 1), 0, 59), pm)
+    }
+  }
+  const field = "w-[2.2ch] bg-transparent text-center font-title text-lg font-semibold text-ink tabular-nums outline-none placeholder:text-ink-3"
+  const half = (isPm: boolean) =>
+    `rounded-md px-1.5 py-0.5 text-[11px] font-semibold transition-colors ${pm === isPm && set ? "bg-surface text-ink-2 shadow-[0_1px_2px_rgb(0_0_0/0.08)]" : "text-ink-3"}`
+
+  return (
+    <div role="group" aria-label={label} className="flex h-11 shrink-0 items-center gap-0.5 rounded-xl border border-line bg-bg pr-1 pl-2.5 focus-within:border-accent">
+      <input
+        id={id}
+        inputMode="numeric"
+        aria-label="Hour"
+        placeholder="--"
+        maxLength={2}
+        value={hText ?? (set ? String(h12) : "")}
+        onFocus={(e) => e.currentTarget.select()}
+        onBlur={() => setHText(null)}
+        onKeyDown={(e) => step(e, "h")}
+        onChange={(e) => {
+          const t = e.target.value.replace(/\D/g, "").slice(0, 2)
+          setHText(t)
+          const n = Number(t)
+          if (t && n >= 1 && n <= 12) emit(n, min, pm)
+          // "1" could still become 10–12; anything else is a whole hour, so go on to minutes.
+          if (t.length === 2 || (t && n > 1)) minutes.current?.focus()
+        }}
+        className={field}
+      />
+      <span className="font-title text-lg font-semibold text-ink-3">:</span>
+      <input
+        ref={minutes}
+        inputMode="numeric"
+        aria-label="Minute"
+        placeholder="--"
+        maxLength={2}
+        value={mText ?? (set ? pad2(min) : "")}
+        onFocus={(e) => e.currentTarget.select()}
+        onBlur={() => setMText(null)}
+        onKeyDown={(e) => step(e, "m")}
+        onChange={(e) => {
+          const t = e.target.value.replace(/\D/g, "").slice(0, 2)
+          setMText(t)
+          const n = Number(t)
+          if (t && n <= 59) emit(h12, n, pm)
+        }}
+        className={field}
+      />
+      <span className="ml-1.5 flex rounded-lg bg-surface-2 p-0.5">
+        <button type="button" aria-pressed={set && !pm} onClick={() => emit(h12, min, false)} className={half(false)}>
+          AM
+        </button>
+        <button type="button" aria-pressed={pm} onClick={() => emit(h12, min, true)} className={half(true)}>
+          PM
+        </button>
+      </span>
+    </div>
+  )
+}
 
 export function Card({ children, className = "" }: { children: ReactNode; className?: string }) {
   return <section className={`rounded-2xl border border-card-line bg-surface p-4 ${className}`}>{children}</section>

@@ -56,7 +56,25 @@ export function blocksForDay(data: AppData, day: DayKey): DayBlock[] {
       blocks.push({ kind: "group", key, group: g, items: mine, expected: g.time, time: changed[key] ?? g.time })
     }
   }
-  return blocks.sort((a, b) => (a.time ?? "99:99").localeCompare(b.time ?? "99:99"))
+  const byTime = blocks.sort((a, b) => (a.time ?? "99:99").localeCompare(b.time ?? "99:99"))
+  return applyOrder(byTime, data.order?.[day])
+}
+
+/**
+ * Put cards in the order you dragged them into. Cards the saved order doesn't know yet (added
+ * later) slot in by time: just before the first ordered card with a later time.
+ */
+function applyOrder(byTime: DayBlock[], keys: string[] | undefined): DayBlock[] {
+  if (!keys?.length) return byTime
+  const rank = new Map(keys.map((k, i) => [k, i]))
+  const out = byTime.filter((b) => rank.has(b.key)).sort((a, b) => rank.get(a.key)! - rank.get(b.key)!)
+  for (const b of byTime) {
+    if (rank.has(b.key)) continue
+    const t = b.time ?? "99:99"
+    const at = out.findIndex((o) => (o.time ?? "99:99") > t)
+    out.splice(at === -1 ? out.length : at, 0, b)
+  }
+  return out
 }
 
 /** Done / total for a day. Days before first use and future days don't count. */

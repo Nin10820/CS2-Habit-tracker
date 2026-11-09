@@ -120,6 +120,10 @@ html.scroll-intro::-webkit-scrollbar-thumb {
 .hc-text {
   color: var(--hc);
 }
+/* Text on a .hc-soft band: the colour pulled toward the text colour (deep in light, pale in dark). */
+.hc-ink {
+  color: color-mix(in oklab, var(--hc) 60%, var(--text));
+}
 
 .press {
   transition: transform 0.2s cubic-bezier(0.3, 1.4, 0.5, 1), background-color 0.15s ease;
@@ -169,10 +173,18 @@ html.scroll-intro::-webkit-scrollbar-thumb {
 .sheet-in {
   animation: sheet-in 0.22s ease-out;
 }
+/* The drop slot opens up from nothing to the dragged card's height. */
+@keyframes drop-slot {
+  from { height: 0; opacity: 0; }
+}
+.drop-slot {
+  animation: drop-slot 0.24s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
 @media (prefers-reduced-motion: reduce) {
   .eq > span,
   .pop,
-  .sheet-in {
+  .sheet-in,
+  .drop-slot {
     animation: none;
   }
   .press {

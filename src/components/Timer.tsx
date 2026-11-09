@@ -49,8 +49,25 @@ type SubHandlers = {
  * With a task picked, the focus length is that task's duration, unless you typed another one.
  * Lives in App so the Quick timer and the mini player share one clock.
  */
-export function useFocusTimer(task?: FocusTask) {
+export function useFocusTimer(task?: FocusTask, onFocusTime?: (seconds: number) => void) {
   const focusMs = (task?.item.minutes ?? FOCUS_MINUTES) * 60_000
+  // Time the focus clock actually ran, handed out in whole seconds: every minute, and on pause,
+  // reset or finish (so stats don't need a write every tick).
+  const report = useRef(onFocusTime)
+  report.current = onFocusTime
+  const pending = useRef(0)
+  const lastTick = useRef(0)
+  const count = (until = Date.now()) => {
+    pending.current += Math.max(0, until - lastTick.current)
+    lastTick.current = until
+  }
+  const flush = () => {
+    const s = Math.floor(pending.current / 1000)
+    if (s > 0) {
+      pending.current -= s * 1000
+      report.current?.(s)
+    }
+  }
   // Lengths typed in for this task (the mini player's minutes field); cleared when the task changes.
   const [custom, setCustom] = useState<Partial<Record<Mode, number>>>({})
   const lengths = useRef<Record<Mode, number>>({ ...LENGTH, focus: focusMs, ...custom })
@@ -82,6 +99,10 @@ export function useFocusTimer(task?: FocusTask) {
     if (!running) return
     const id = setInterval(() => {
       const ms = Math.max(0, endsAt.current - Date.now())
+      if (running === "focus") {
+        count(Math.min(Date.now(), endsAt.current))
+        if (ms === 0 || pending.current >= 60_000) flush()
+      }
       setLeft((l) => ({ ...l, [running]: ms }))
       document.title = `${mmss(ms)} · ${running === "focus" ? (taskName ?? "Focus") : "Break"}`
       if (ms === 0) {
@@ -96,6 +117,17 @@ export function useFocusTimer(task?: FocusTask) {
     return () => clearInterval(id)
   }, [running, taskName])
 
+  // Closing or leaving the page mid-session still counts the time so far.
+  useEffect(() => {
+    if (running !== "focus") return
+    const leave = () => {
+      count()
+      flush()
+    }
+    window.addEventListener("pagehide", leave)
+    return () => window.removeEventListener("pagehide", leave)
+  }, [running])
+
   useEffect(() => {
     const t = baseTitle.current
     return () => {
@@ -106,6 +138,10 @@ export function useFocusTimer(task?: FocusTask) {
   /** Start or pause a clock. `startMs` starts it fresh at that length (a length just typed in). */
   function toggle(mode: Mode, startMs?: number) {
     setFinished(null)
+    if (running === "focus") {
+      count()
+      flush()
+    }
     if (running === mode) {
       setRunning(null)
       document.title = baseTitle.current
@@ -114,12 +150,17 @@ export function useFocusTimer(task?: FocusTask) {
     const ms = startMs ?? left[mode]
     if (startMs !== undefined) setLeft((l) => ({ ...l, [mode]: startMs }))
     endsAt.current = Date.now() + ms
+    lastTick.current = Date.now()
     // A fresh start (not a resume after pause) notes the time it began.
     if (startMs !== undefined || left[mode] >= lengths.current[mode] || startedAt === null) setStartedAt(Date.now())
     setRunning(mode)
   }
 
   function reset(mode: Mode) {
+    if (running === "focus" && mode === "focus") {
+      count()
+      flush()
+    }
     if (running === mode) setRunning(null)
     setLeft((l) => ({ ...l, [mode]: lengths.current[mode] }))
     setStartedAt(null)

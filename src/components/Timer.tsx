@@ -2,7 +2,7 @@ import { ArrowCounterClockwise, Check, Pause, Play, Timer as TimerIcon, X } from
 import { useEffect, useRef, useState } from "react"
 import { BREAK_MINUTES, FOCUS_MINUTES } from "../config/groups"
 import { formatShort, type DayKey } from "../lib/date"
-import { colorVar, type DayItem } from "../lib/types"
+import { colorVar, type FocusItem } from "../lib/types"
 import { Card } from "./ui"
 
 type Mode = "focus" | "break"
@@ -34,7 +34,7 @@ function chime() {
   }
 }
 
-export type FocusTask = { item: DayItem; day: DayKey; today: DayKey }
+export type FocusTask = { item: FocusItem; day: DayKey; today: DayKey }
 
 /**
  * Focus / break countdown state. One runs at a time; each keeps its remaining time while paused.

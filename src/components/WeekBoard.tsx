@@ -40,6 +40,7 @@ export function WeekBoard({
   onAdd,
   onEdit,
   onFocus,
+  onFocusGroup,
   onSetTime,
   focusKey,
   leading,
@@ -51,6 +52,7 @@ export function WeekBoard({
   onAdd: (day: DayKey) => void
   onEdit: (item: DayItem) => void
   onFocus: (item: DayItem, day: DayKey) => void
+  onFocusGroup: (groupId: string, day: DayKey) => void
   onSetTime: (day: DayKey, key: string, time: string | null) => void
   focusKey?: string
   /** Extra controls at the start / end of the top bar (panel toggles, theme, settings). */
@@ -178,6 +180,7 @@ export function WeekBoard({
           onAdd={() => onAdd(day)}
           onEdit={onEdit}
           onFocus={(i) => onFocus(i, day)}
+          onFocusGroup={(g) => onFocusGroup(g, day)}
           focusKey={focusKey}
         />
       </div>
@@ -199,6 +202,7 @@ export function WeekBoard({
             onAdd={() => onAdd(day)}
             onEdit={onEdit}
             onFocus={(i) => onFocus(i, day)}
+            onFocusGroup={(g) => onFocusGroup(g, day)}
             focusKey={focusKey}
           />
         ) : (
@@ -214,6 +218,7 @@ export function WeekBoard({
               onAdd={() => onAdd(k)}
               onEdit={onEdit}
               onFocus={(i) => onFocus(i, k)}
+              onFocusGroup={(g) => onFocusGroup(g, k)}
               focusKey={focusKey}
             />
           ))

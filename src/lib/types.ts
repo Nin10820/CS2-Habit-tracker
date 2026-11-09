@@ -24,6 +24,9 @@ export type AppData = {
 }
 
 /** One habit or one-off task on a day (flat; used for stats, focus and checklists). */
+/** What the Quick timer / mini player can focus on: one item, or a whole group card for a day. */
+export type FocusItem = Omit<DayItem, "kind"> & { kind: DayItem["kind"] | "group" }
+
 export type DayItem = {
   kind: "habit" | "task"
   id: string

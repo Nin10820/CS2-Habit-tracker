@@ -21,6 +21,7 @@ export function DayColumn({
   onAdd,
   onEdit,
   onFocus,
+  onFocusGroup,
   onSetTime,
   focusKey,
   className = "",
@@ -30,6 +31,8 @@ export function DayColumn({
   today: DayKey
   blocks: DayBlock[]
   onAdd: () => void
+  /** Clicking a group card's title puts the whole group in the Quick timer. */
+  onFocusGroup: (groupId: string) => void
   /** Change a card's time for this day; null goes back to the expected time. */
   onSetTime: (key: string, time: string | null) => void
   /** "day:kind:id" of the focused item, to highlight it. */
@@ -81,7 +84,15 @@ export function DayColumn({
           <Fragment key={b.key}>
             {idx === marker && <NowMarker time={now!} />}
             {b.kind === "group" ? (
-              <GroupBlock block={b} future={future} isFocused={isFocused} onSetTime={(t) => onSetTime(b.key, t)} {...handlers} />
+              <GroupBlock
+                block={b}
+                future={future}
+                isFocused={isFocused}
+                groupFocused={focusKey === `${day}:group:${b.group.id}`}
+                onFocusGroup={() => onFocusGroup(b.group.id)}
+                onSetTime={(t) => onSetTime(b.key, t)}
+                {...handlers}
+              />
             ) : (
               <SingleBlock block={b} future={future} focused={isFocused(b.item)} onSetTime={(t) => onSetTime(b.key, t)} {...handlers} />
             )}
@@ -174,6 +185,8 @@ function GroupBlock({
   block,
   future,
   isFocused,
+  groupFocused,
+  onFocusGroup,
   onSetTime,
   onToggle,
   onEdit,
@@ -182,6 +195,8 @@ function GroupBlock({
   block: Extract<DayBlock, { kind: "group" }>
   future: boolean
   isFocused: (i: DayItem) => boolean
+  groupFocused: boolean
+  onFocusGroup: () => void
   onSetTime: (t: string | null) => void
 }) {
   const { group, items } = block
@@ -190,18 +205,26 @@ function GroupBlock({
   const done = items.filter((i) => i.done).length
 
   return (
-    <li style={{ ["--hc" as string]: colorVar(group.color) }} className="rounded-xl border border-line bg-surface shadow-card">
+    <li
+      style={{ ["--hc" as string]: colorVar(group.color) }}
+      className={`rounded-xl border bg-surface shadow-card ${groupFocused ? "border-accent ring-1 ring-accent ring-inset" : "border-line"}`}
+    >
       <div className="flex items-center gap-2 px-3 pt-3">
         <TimeChip time={block.time} expected={block.expected} onChange={onSetTime} />
         {total > 0 && <span className={`${chip} ml-auto bg-surface-2 text-ink-2`}>{fmtDuration(total)}</span>}
       </div>
-      <div className="flex items-center gap-2 px-3 pt-2">
+      <button
+        onClick={onFocusGroup}
+        aria-current={groupFocused ? "true" : undefined}
+        title="Focus on this group"
+        className="flex w-full items-center gap-2 px-3 pt-2 text-left"
+      >
         <Icon size={16} className="hc-text shrink-0" aria-hidden />
         <span className="min-w-0 flex-1 truncate font-semibold">{group.label}</span>
         <span className="shrink-0 text-xs font-medium text-ink-3 tabular-nums">
           {done}/{items.length}
         </span>
-      </div>
+      </button>
       <ul className="px-1.5 pt-1.5 pb-2">
         {items.map((i) => {
           const focused = isFocused(i)

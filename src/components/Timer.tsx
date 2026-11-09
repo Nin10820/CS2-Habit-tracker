@@ -1,8 +1,8 @@
-import { ArrowCounterClockwise, Check, Pause, Play, Timer as TimerIcon, X } from "@phosphor-icons/react"
+import { ArrowCounterClockwise, CaretDown, CaretUp, Check, Pause, Play, Timer as TimerIcon, X } from "@phosphor-icons/react"
 import { useEffect, useRef, useState } from "react"
 import { BREAK_MINUTES, FOCUS_MINUTES } from "../config/groups"
 import { formatShort, type DayKey } from "../lib/date"
-import { colorVar, type FocusItem } from "../lib/types"
+import { colorVar, type DayItem, type FocusItem } from "../lib/types"
 import { Card } from "./ui"
 
 type Mode = "focus" | "break"
@@ -34,7 +34,68 @@ function chime() {
   }
 }
 
-export type FocusTask = { item: FocusItem; day: DayKey; today: DayKey }
+/** The focused group: the group as one item, its items, and the item picked inside it (if any). */
+export type FocusGroup = { item: FocusItem; items: DayItem[]; active?: DayItem }
+export type FocusTask = { item: FocusItem; day: DayKey; today: DayKey; group?: FocusGroup }
+
+/** Handlers for the sub-task list of a focused group. */
+type SubHandlers = {
+  onToggleSub: (item: DayItem) => void
+  onPickSub: (item: DayItem) => void
+  onPickGroup: () => void
+}
+
+/**
+ * A focused group's items. Click one to focus on just that item; click the top row to go back to the whole group.
+ */
+function SubtaskList({ group, future, onToggleSub, onPickSub, onPickGroup }: SubHandlers & { group: FocusGroup; future: boolean }) {
+  const done = group.items.filter((i) => i.done).length
+  const whole = !group.active
+  return (
+    <div style={{ ["--hc" as string]: colorVar(group.item.group.color) }}>
+      <button
+        onClick={onPickGroup}
+        aria-current={whole ? "true" : undefined}
+        className={`flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-left text-xs font-semibold ${whole ? "bg-accent-soft text-accent" : "text-ink-3"}`}
+      >
+        <span className="min-w-0 flex-1 truncate">Whole group · {group.item.name}</span>
+        <span className="shrink-0 tabular-nums">
+          {done}/{group.items.length}
+          {group.item.minutes ? ` · ${group.item.minutes}′` : ""}
+        </span>
+      </button>
+      <ul className="mt-1">
+        {group.items.map((i) => {
+          const on = group.active?.kind === i.kind && group.active.id === i.id
+          return (
+            <li key={`${i.kind}-${i.id}`} className={`flex items-center gap-1 rounded-lg pl-1.5 ${on ? "ring-2 ring-accent ring-inset" : ""}`}>
+              <button
+                onClick={() => onToggleSub(i)}
+                disabled={future}
+                aria-pressed={i.done}
+                aria-label={i.done ? `Mark ${i.name} not done` : `Mark ${i.name} done`}
+                className="-m-1 grid shrink-0 place-items-center p-1 disabled:opacity-35"
+              >
+                <span className={`grid size-5 place-items-center rounded-full border-2 ${i.done ? "hc-fill border-transparent text-white" : "border-line text-ink-3"}`}>
+                  <Check size={10} weight="bold" className={i.done ? "pop" : "opacity-60"} />
+                </span>
+              </button>
+              <button
+                onClick={() => onPickSub(i)}
+                aria-current={on ? "true" : undefined}
+                title="Focus on this"
+                className={`min-w-0 flex-1 truncate py-1.5 pl-1.5 text-left text-sm ${i.done ? "text-ink-3" : ""} ${on ? "font-semibold" : ""}`}
+              >
+                {i.name}
+              </button>
+              {i.minutes ? <span className="shrink-0 pr-2 text-[11px] text-ink-3 tabular-nums">{i.minutes}′</span> : null}
+            </li>
+          )
+        })}
+      </ul>
+    </div>
+  )
+}
 
 /**
  * Focus / break countdown state. One runs at a time; each keeps its remaining time while paused.
@@ -114,7 +175,8 @@ export function QuickTimer({
   timer,
   onToggleTask,
   onClearTask,
-}: {
+  ...sub
+}: SubHandlers & {
   task?: FocusTask
   timer: FocusTimer
   onToggleTask: () => void
@@ -163,6 +225,11 @@ export function QuickTimer({
           </div>
         ) : (
           <p className="mt-1 text-sm text-ink-3">Click a habit or task to focus on it.</p>
+        )}
+        {task?.group && (
+          <div className="mt-3 border-t border-line pt-2">
+            <SubtaskList group={task.group} future={task.day > task.today} {...sub} />
+          </div>
         )}
       </section>
 
@@ -223,7 +290,8 @@ export function MiniPlayer({
   onToggleTask,
   onClose,
   onExpand,
-}: {
+  ...sub
+}: SubHandlers & {
   task: FocusTask
   timer: FocusTimer
   onToggleTask: () => void
@@ -236,6 +304,8 @@ export function MiniPlayer({
   const on = running === mode
   const progress = 1 - left[mode] / lengths[mode]
   const { item } = task
+  // A group's sub-task list opens above the bar; it starts open and can be folded away.
+  const [listOpen, setListOpen] = useState(true)
 
   return (
     <div
@@ -247,6 +317,11 @@ export function MiniPlayer({
       <div className="h-1 bg-surface-2" aria-hidden>
         <div className={`h-full transition-[width] duration-300 ${mode === "focus" ? "bg-accent" : "hc-fill"}`} style={{ width: `${progress * 100}%` }} />
       </div>
+      {task.group && listOpen && (
+        <div className="max-h-[40vh] overflow-y-auto border-b border-line px-2 py-2">
+          <SubtaskList group={task.group} future={task.day > task.today} {...sub} />
+        </div>
+      )}
       <div className="flex items-center gap-2 py-2 pr-2 pl-3">
         <button
           onClick={onToggleTask}
@@ -266,6 +341,17 @@ export function MiniPlayer({
             {item.group.label} · {finished && !running ? (finished === "focus" ? "Focus done, take a break" : "Break over") : mode === "focus" ? "Focus" : "Break"}
           </p>
         </button>
+        {task.group && (
+          <button
+            onClick={() => setListOpen((o) => !o)}
+            aria-expanded={listOpen}
+            aria-label={listOpen ? "Hide sub-tasks" : "Show sub-tasks"}
+            title={listOpen ? "Hide sub-tasks" : "Show sub-tasks"}
+            className="press grid size-8 shrink-0 place-items-center rounded-full text-ink-3"
+          >
+            {listOpen ? <CaretDown size={14} weight="bold" /> : <CaretUp size={14} weight="bold" />}
+          </button>
+        )}
         <span className={`shrink-0 font-title text-lg font-semibold tabular-nums ${on ? "text-accent" : "text-ink-2"}`}>{mmss(left[mode])}</span>
         <button
           onClick={() => toggle(mode)}

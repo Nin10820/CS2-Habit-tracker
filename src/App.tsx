@@ -4,7 +4,7 @@ import { GroupCard } from "./components/GroupCard"
 import { ProgressPanel } from "./components/ProgressPanel"
 import { SettingsSheet } from "./components/SettingsSheet"
 import { TaskSheet } from "./components/TaskSheet"
-import { MiniPlayer, QuickTimer, useFocusTimer } from "./components/Timer"
+import { MiniPlayer, QuickTimer, useFocusTimer, type FocusTask } from "./components/Timer"
 import { WeekBoard } from "./components/WeekBoard"
 import { GROUPS } from "./config/groups"
 import { todayKey, type DayKey } from "./lib/date"
@@ -70,7 +70,7 @@ function usePanel(name: string) {
   return [open, setOpen] as const
 }
 
-type FocusRef = { kind: FocusItem["kind"]; id: string; day: DayKey }
+type FocusRef = { day: DayKey; groupId?: string; item?: { kind: DayItem["kind"]; id: string } }
 
 type SheetState ={ kind: "add"; day: DayKey } | { kind: "edit"; task: Task } | { kind: "settings" } | null
 
@@ -97,35 +97,52 @@ export default function App() {
   }
   const todayItems = itemsForDay(data, today)
 
-  // The item the Quick timer is focused on. Clicking any habit or task picks it.
+  // What the Quick timer is focused on: a group card (its items listed as sub-tasks), optionally one item in it,
+  // or a standalone item. Clicking a group title picks the group; clicking an item picks that item.
   const [focus, setFocus] = useState<FocusRef | null>(null)
-  // A whole group counts as one item: its total minutes, done when every item in it is done.
   const focusDayItems = focus ? itemsForDay(data, focus.day) : []
-  const groupMembers = focus?.kind === "group" ? focusDayItems.filter((i) => i.group.id === focus.id) : []
-  const focused: FocusItem | undefined =
-    focus?.kind === "group"
-      ? groupMembers.length
-        ? {
-            kind: "group",
-            id: focus.id,
-            name: groupMembers[0].group.label,
-            group: groupMembers[0].group,
-            minutes: groupMembers.reduce((s, i) => s + (i.minutes ?? 0), 0) || undefined,
-            done: groupMembers.every((i) => i.done),
-          }
-        : undefined
-      : focusDayItems.find((i) => i.kind === focus?.kind && i.id === focus?.id)
-  const focusKey = focused && focus ? `${focus.day}:${focus.kind}:${focus.id}` : undefined
+  const groupMembers = focus?.groupId ? focusDayItems.filter((i) => i.group.id === focus.groupId) : []
+  const focusedItem = focus?.item ? focusDayItems.find((i) => i.kind === focus.item!.kind && i.id === focus.item!.id) : undefined
+  // A whole group counts as one item: its total minutes, done when every item in it is done.
+  const groupItem: FocusItem | undefined =
+    focus?.groupId && groupMembers.length
+      ? {
+          kind: "group",
+          id: focus.groupId,
+          name: groupMembers[0].group.label,
+          group: groupMembers[0].group,
+          minutes: groupMembers.reduce((s, i) => s + (i.minutes ?? 0), 0) || undefined,
+          done: groupMembers.every((i) => i.done),
+        }
+      : undefined
+  const focused: FocusItem | undefined = focusedItem ?? groupItem
+  const focusKey = focused && focus ? `${focus.day}:${focused.kind}:${focused.id}` : undefined
   // Picking only sets the task: the view stays put, and the mini player shows it if the Quick timer is off screen.
-  const pickFocus = (item: DayItem, day: DayKey) => setFocus({ kind: item.kind, id: item.id, day })
-  const pickGroup = (groupId: string, day: DayKey) => setFocus({ kind: "group", id: groupId, day })
+  const pickFocus = (item: DayItem, day: DayKey) =>
+    setFocus({ day, groupId: item.group.standalone ? undefined : item.group.id, item: { kind: item.kind, id: item.id } })
+  const pickGroup = (groupId: string, day: DayKey) => setFocus({ day, groupId })
+  const backToGroup = () => setFocus((f) => (f ? { ...f, item: undefined } : f))
   // Ticking a focused group ticks all its items, or unticks them all when they're all done.
   const toggleFocused = () => {
     if (!focused || !focus) return
     if (focused.kind !== "group") return toggle(focused as DayItem, focus.day)
     groupMembers.filter((i) => i.done === focused.done).forEach((i) => toggle(i, focus.day))
   }
-  const focusTask = focused && focus ? { item: focused, day: focus.day, today } : undefined
+  const focusTask: FocusTask | undefined =
+    focused && focus
+      ? {
+          item: focused,
+          day: focus.day,
+          today,
+          group: groupItem && { item: groupItem, items: groupMembers, active: focusedItem },
+        }
+      : undefined
+  const focusHandlers = {
+    onToggleTask: toggleFocused,
+    onToggleSub: (i: DayItem) => focus && toggle(i, focus.day),
+    onPickSub: (i: DayItem) => focus && pickFocus(i, focus.day),
+    onPickGroup: backToGroup,
+  }
   const timer = useFocusTimer(focusTask)
 
   const wide = useWide()
@@ -208,7 +225,7 @@ export default function App() {
           <QuickTimer
             task={focusTask}
             timer={timer}
-            onToggleTask={toggleFocused}
+            {...focusHandlers}
             onClearTask={() => setFocus(null)}
           />
           {GROUPS.filter((g) => !g.standalone).map((g) => (
@@ -218,7 +235,7 @@ export default function App() {
               items={todayItems.filter((i) => i.group.id === g.id)}
               onToggle={(i) => toggle(i, today)}
               onFocus={(i) => pickFocus(i, today)}
-              focusedId={focus?.day === today && focused ? `${focus.kind}:${focus.id}` : undefined}
+              focusedId={focus?.day === today && focused ? `${focused.kind}:${focused.id}` : undefined}
             />
           ))}
         </div>
@@ -294,7 +311,7 @@ export default function App() {
         <MiniPlayer
           task={focusTask}
           timer={timer}
-          onToggleTask={toggleFocused}
+          {...focusHandlers}
           onClose={closeMini}
           onExpand={openTimer}
         />

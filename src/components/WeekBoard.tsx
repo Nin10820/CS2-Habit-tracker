@@ -1,9 +1,10 @@
 import { CalendarBlank, CaretDown, CaretLeft, CaretRight, Clock } from "@phosphor-icons/react"
 import { useEffect, useRef, useState, type ReactNode } from "react"
 import { useClock } from "../lib/clock"
-import { addDays, dayOfMonth, formatDow, formatFull, formatLong, formatWeekRange, isoWeek, startOfWeek, weekOf, type DayKey } from "../lib/date"
+import { addDays, dayOfMonth, formatDow, formatFull, formatLong, formatWeekMonths, isoWeek, startOfWeek, weekOf, type DayKey } from "../lib/date"
+import { routineOn } from "../lib/routine"
 import { blocksForDay, itemsForDay } from "../lib/stats"
-import type { AppData, DayItem } from "../lib/types"
+import type { AppData, DayItem, RoutineItem } from "../lib/types"
 import { DayColumn } from "./DayColumn"
 import { Ring } from "./ui"
 
@@ -41,6 +42,10 @@ export function WeekBoard({
   onEdit,
   onFocus,
   onFocusGroup,
+  onGroupMenu,
+  onRoutine,
+  onDropRoutine,
+  dayParts = false,
   onSetTime,
   focusKey,
   leading,
@@ -53,6 +58,14 @@ export function WeekBoard({
   onEdit: (item: DayItem) => void
   onFocus: (item: DayItem, day: DayKey) => void
   onFocusGroup: (groupId: string, day: DayKey) => void
+  /** The "⋯" on a group card: edit the group, or take it off the day. */
+  onGroupMenu: (groupId: string, day: DayKey) => void
+  /** Log a routine moment's time on a day. */
+  onRoutine: (item: RoutineItem, day: DayKey) => void
+  /** A routine moment dragged from the Routine card onto a day. */
+  onDropRoutine: (id: string, day: DayKey) => void
+  /** Split each day into Morning / Afternoon / Evening / Anytime (Settings). */
+  dayParts?: boolean
   onSetTime: (day: DayKey, key: string, time: string | null) => void
   focusKey?: string
   /** Extra controls at the start / end of the top bar (panel toggles, theme, settings). */
@@ -96,12 +109,15 @@ export function WeekBoard({
     setPicked(next <= today && today <= addDays(next, 6) ? today : next)
   }
   const unit = view === "day" ? "day" : "week"
+  const routineFor = (d: DayKey) => routineOn(data, d).map((item) => ({ item, time: data.routine.log[item.id]?.[d] }))
 
   const btn = "press flex h-10 items-center gap-1.5 rounded-xl px-3 text-sm font-semibold"
 
   return (
-    <div className="flex min-w-0 flex-col xl:h-full">
-      {/* Top bar. From 1280px it spans the middle column, with the panel toggles at its ends. */}
+    <div className="@container flex min-w-0 flex-col xl:h-full">
+      {/* Top bar. From 1280px it spans the middle column, with the panel toggles at its ends.
+          It stays one line there, so as the column narrows (both panels open) it drops the week
+          label, the clock (the progress panel has one), the Today label and then the view picker. */}
       <div className="flex flex-wrap items-center gap-x-3 gap-y-3 xl:h-16 xl:shrink-0 xl:flex-nowrap xl:border-b xl:border-line xl:px-4">
         {leading}
         <div className="flex shrink-0 rounded-full border border-line bg-surface">
@@ -112,13 +128,15 @@ export function WeekBoard({
             <CaretRight size={16} weight="bold" />
           </button>
         </div>
-        <div className="flex min-w-0 flex-1 basis-0 items-baseline gap-2 md:flex-none md:basis-auto">
-          <h1 className="truncate text-lg font-semibold sm:text-2xl xl:text-[28px]">
-            {view === "day" ? formatFull(day) : formatWeekRange(weekStart)}
+        <div className="flex min-w-0 flex-1 basis-0 items-baseline gap-2 md:flex-none md:basis-auto xl:flex-1 xl:basis-0">
+          <h1 className="truncate text-xl leading-none font-semibold sm:text-2xl xl:text-[26px]">
+            {view === "day" ? formatFull(day) : formatWeekMonths(weekStart)}
           </h1>
-          <span className="shrink-0 text-xs font-semibold tracking-wider whitespace-nowrap text-ink-2 uppercase sm:text-sm">Week {isoWeek(day)}</span>
+          <span className="shrink-0 text-xs font-semibold tracking-wider whitespace-nowrap text-ink-2 uppercase sm:text-sm xl:@max-5xl:hidden">
+            Week {isoWeek(day)}
+          </span>
         </div>
-        <div className="relative hidden shrink-0 md:block">
+        <div className="relative hidden shrink-0 md:block xl:@max-2xl:hidden">
           <select
             value={view}
             onChange={(e) => setView(e.target.value as View)}
@@ -130,13 +148,13 @@ export function WeekBoard({
           </select>
           <CaretDown size={12} weight="bold" className="pointer-events-none absolute top-1/2 right-4 -translate-y-1/2 text-ink-2" />
         </div>
-        <div className="flex w-full items-center justify-end gap-2 md:ml-auto md:w-auto">
-          <button onClick={goToday} className={`${btn} bg-accent-soft text-accent`}>
-            <CalendarBlank size={18} /> Today
+        <div className="flex w-full items-center justify-end gap-2 md:ml-auto md:w-auto xl:shrink-0">
+          <button onClick={goToday} aria-label="Today" title="Today" className={`${btn} bg-accent-soft text-accent`}>
+            <CalendarBlank size={18} /> <span className="xl:@max-4xl:hidden">Today</span>
           </button>
           <div
             aria-label={`Current time ${clock}`}
-            className="flex h-10 items-center gap-1.5 rounded-xl border border-line bg-surface px-3 text-sm font-semibold text-ink tabular-nums"
+            className="flex h-10 items-center gap-1.5 rounded-xl border border-line bg-surface px-3 text-sm font-semibold text-ink tabular-nums xl:@max-4xl:hidden"
           >
             <Clock size={18} className="text-ink-2" /> {clock}
           </div>
@@ -158,12 +176,18 @@ export function WeekBoard({
                 aria-selected={active}
                 aria-label={formatLong(k)}
                 onClick={() => setPicked(k)}
-                className={`press flex flex-col items-center gap-1 rounded-2xl py-2 ${active ? "bg-accent text-on-accent" : "bg-surface text-ink-2"}`}
+                className="press flex flex-col items-center gap-1 py-1"
               >
-                <span className="text-[11px] font-medium">{k === today ? "Today" : formatDow(k)}</span>
+                <span className={`text-[10px] font-semibold tracking-[0.1em] uppercase ${k === today ? "text-accent" : "text-ink-2"}`}>{formatDow(k)}</span>
                 <span className="relative grid place-items-center">
-                  {!active && <Ring value={k > today ? null : rate} size={30} />}
-                  <span className={`text-sm font-semibold ${active ? "leading-[30px]" : "absolute text-ink"}`}>{dayOfMonth(k)}</span>
+                  {!active && <Ring value={k > today ? null : rate} size={34} />}
+                  <span
+                    className={`grid size-[34px] place-items-center rounded-full font-title text-sm leading-none font-semibold ${
+                      active ? "bg-accent text-on-accent" : k === today ? "absolute text-accent" : "absolute text-ink"
+                    }`}
+                  >
+                    {dayOfMonth(k)}
+                  </span>
                 </span>
               </button>
             )
@@ -171,6 +195,7 @@ export function WeekBoard({
         </div>
         <DayColumn
           className="mt-4"
+          showHeader={false}
           now={clock}
           day={day}
           today={today}
@@ -181,6 +206,11 @@ export function WeekBoard({
           onEdit={onEdit}
           onFocus={(i) => onFocus(i, day)}
           onFocusGroup={(g) => onFocusGroup(g, day)}
+          onGroupMenu={(g) => onGroupMenu(g, day)}
+          routine={routineFor(day)}
+          onRoutine={(i) => onRoutine(i, day)}
+          onDropRoutine={(id) => onDropRoutine(id, day)}
+          dayParts={dayParts}
           focusKey={focusKey}
         />
       </div>
@@ -188,7 +218,7 @@ export function WeekBoard({
       {/* 768px+: seven columns side by side */}
       <div
         ref={scroller}
-        className="mt-5 hidden snap-x scroll-px-4 xl:scroll-px-20 items-start gap-5 overflow-x-auto pb-3 md:flex xl:mt-0 xl:min-h-0 xl:flex-1 xl:overflow-auto xl:px-20 xl:py-4"
+        className="mt-5 hidden snap-x scroll-px-4 items-start gap-6 overflow-x-auto pb-3 md:flex xl:mt-0 xl:min-h-0 xl:flex-1 xl:overflow-auto xl:px-4 xl:py-4"
       >
         {view === "day" ? (
           <DayColumn
@@ -203,13 +233,18 @@ export function WeekBoard({
             onEdit={onEdit}
             onFocus={(i) => onFocus(i, day)}
             onFocusGroup={(g) => onFocusGroup(g, day)}
+            onGroupMenu={(g) => onGroupMenu(g, day)}
+            routine={routineFor(day)}
+            onRoutine={(i) => onRoutine(i, day)}
+            onDropRoutine={(id) => onDropRoutine(id, day)}
+            dayParts={dayParts}
             focusKey={focusKey}
           />
         ) : (
           days.map((k) => (
             <DayColumn
               key={k}
-              className="min-w-[236px] flex-1 snap-start xl:min-w-[128px]"
+              className="min-w-[296px] flex-1 snap-start"
               day={k}
               today={today}
               blocks={blocksForDay(data, k)}
@@ -219,6 +254,11 @@ export function WeekBoard({
               onEdit={onEdit}
               onFocus={(i) => onFocus(i, k)}
               onFocusGroup={(g) => onFocusGroup(g, k)}
+              onGroupMenu={(g) => onGroupMenu(g, k)}
+              routine={routineFor(k)}
+              onRoutine={(i) => onRoutine(i, k)}
+              onDropRoutine={(id) => onDropRoutine(id, k)}
+              dayParts={dayParts}
               focusKey={focusKey}
             />
           ))

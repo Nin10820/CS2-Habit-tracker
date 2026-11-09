@@ -65,6 +65,15 @@ export function formatWeekRange(start: DayKey): string {
   return `${month(s)} ${s.getDate()} – ${e.getDate()}, ${e.getFullYear()}`
 }
 
+/** "November 2026", or "October – November 2026" for a week across two months. */
+export function formatWeekMonths(start: DayKey): string {
+  const [s, e] = [fromKey(start), fromKey(addDays(start, 6))]
+  const month = (d: Date) => d.toLocaleDateString("en-US", { month: "long" })
+  if (s.getFullYear() !== e.getFullYear()) return `${month(s)} ${s.getFullYear()} – ${month(e)} ${e.getFullYear()}`
+  if (s.getMonth() !== e.getMonth()) return `${month(s)} – ${month(e)} ${e.getFullYear()}`
+  return `${month(s)} ${s.getFullYear()}`
+}
+
 const monthYearFmt = fmt({ month: "long", year: "numeric" })
 export const formatMonthYear = (k: DayKey) => monthYearFmt.format(fromKey(k))
 

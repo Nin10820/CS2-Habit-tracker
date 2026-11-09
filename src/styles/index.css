@@ -8,6 +8,7 @@
   --color-surface: var(--surface);
   --color-surface-2: var(--surface-2);
   --color-line: var(--border);
+  --color-card-line: var(--card-line);
   --color-ink: var(--text);
   --color-ink-2: var(--text-2);
   --color-ink-3: var(--text-3);
@@ -113,7 +114,7 @@ html.scroll-intro::-webkit-scrollbar-thumb {
   background: var(--hc);
 }
 .hc-soft {
-  background: color-mix(in oklab, var(--hc) 16%, var(--surface));
+  background: color-mix(in oklab, var(--hc) 11%, var(--surface));
 }
 .hc-text {
   color: var(--hc);

@@ -1,7 +1,8 @@
+import { CaretUp, Plus } from "@phosphor-icons/react"
 import type { ReactNode } from "react"
 
 export function Card({ children, className = "" }: { children: ReactNode; className?: string }) {
-  return <section className={`rounded-3xl border border-line bg-surface p-4 shadow-card sm:p-5 ${className}`}>{children}</section>
+  return <section className={`rounded-2xl border border-card-line bg-surface p-4 ${className}`}>{children}</section>
 }
 
 export function SectionTitle({ children, right }: { children: ReactNode; right?: ReactNode }) {
@@ -44,3 +45,64 @@ export function Ring({ value, size = 28, stroke = 3 }: { value: number | null; s
     </svg>
   )
 }
+
+/**
+ * Section heading of the side panel: a pill with the name and count that folds the list,
+ * plus small actions on the right.
+ */
+export function PillHeader({
+  label,
+  count,
+  open,
+  onToggle,
+  icon,
+  tinted = false,
+  children,
+}: {
+  label: ReactNode
+  count?: string
+  open: boolean
+  onToggle: () => void
+  /** Small icon before the name. */
+  icon?: ReactNode
+  /** Fill with the group's soft color (needs --hc set on a parent) instead of plain grey. */
+  tinted?: boolean
+  /** Actions on the right (add, edit, open…). */
+  children?: ReactNode
+}) {
+  return (
+    <div className="flex items-center justify-between gap-2">
+      <button
+        onClick={onToggle}
+        aria-expanded={open}
+        className={`press flex min-w-0 items-center gap-2 rounded-full px-3 py-1.5 text-[11px] font-medium tracking-[0.5px] text-ink uppercase ${tinted ? "hc-soft" : "bg-surface-2"}`}
+      >
+        {icon}
+        <span className="truncate">{label}</span>
+        {count && <span className="shrink-0 tabular-nums">({count})</span>}
+        <CaretUp size={12} weight="bold" className={`shrink-0 transition-transform ${open ? "" : "rotate-180"}`} />
+      </button>
+      {children && <div className="flex shrink-0 items-center gap-1">{children}</div>}
+    </div>
+  )
+}
+
+/** Small round action next to a PillHeader. */
+export const pillAction = "press grid size-7 place-items-center rounded-full bg-surface-2 text-ink-2"
+
+/** Empty state under a side panel heading: a dashed box with a hint and a + on the right. */
+export function DashedEmpty({ text, onAdd, addLabel }: { text: string; onAdd?: () => void; addLabel?: string }) {
+  return (
+    <div className="flex h-10 items-center justify-between rounded-2xl border-2 border-dashed border-line pr-2 pl-3 text-sm text-ink-3">
+      <span className="truncate">{text}</span>
+      {onAdd && (
+        <button onClick={onAdd} aria-label={addLabel ?? "Add"} title={addLabel} className="press grid size-6 shrink-0 place-items-center rounded-full bg-surface-2 text-ink-3">
+          <Plus size={13} weight="bold" />
+        </button>
+      )}
+    </div>
+  )
+}
+
+/** A rounded row in the side panel lists: round icon on the left, then the content. */
+export const listRow = "flex min-h-[42px] items-center gap-3 rounded-2xl bg-surface py-1.5 pr-3 pl-1.5 shadow-card"

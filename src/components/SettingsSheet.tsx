@@ -1,20 +1,25 @@
 import { Desktop, DownloadSimple, Moon, Sun, Trash, UploadSimple } from "@phosphor-icons/react"
 import { useRef, useState } from "react"
-import { emptyData, exportData, parseData, type Store } from "../lib/store"
+import { defaultData, exportData, parseData, type Store } from "../lib/store"
 import type { ThemePref } from "../lib/theme"
 import type { AppData } from "../lib/types"
 import { ConfirmSheet, Sheet } from "./Sheet"
 
-/** Theme and data (backup, restore, clear). Groups and habits are edited in src/config/groups.ts. */
+/** Theme and data (backup, restore, clear). Groups are made in the app and are part of this data. */
 export function SettingsSheet({
   store,
   theme,
   setTheme,
+  dayParts,
+  setDayParts,
   onClose,
 }: {
   store: Store
   theme: ThemePref
   setTheme: (t: ThemePref) => void
+  /** Split each day into Morning / Afternoon / Evening / Anytime. */
+  dayParts: boolean
+  setDayParts: (on: boolean) => void
   onClose: () => void
 }) {
   const file = useRef<HTMLInputElement>(null)
@@ -48,9 +53,9 @@ export function SettingsSheet({
     return (
       <ConfirmSheet
         title="Clear all data?"
-        body="All check-ins and one-off tasks on this device will be deleted. Your groups and habits stay (they live in the config file)."
+        body="All check-ins, one-off tasks and changes to your groups on this device will be deleted. The app goes back to your starting groups."
         confirmLabel="Clear all"
-        onConfirm={() => store.replaceAll(emptyData())}
+        onConfirm={() => store.replaceAll(defaultData())}
         onClose={onClose}
       />
     )
@@ -82,6 +87,19 @@ export function SettingsSheet({
           </button>
         ))}
       </div>
+
+      <p className="mt-6 text-xs font-semibold text-ink-2">Days</p>
+      <label className="mt-2 flex cursor-pointer items-center gap-3 rounded-2xl bg-surface-2 p-3">
+        <span className="min-w-0 flex-1 text-sm">
+          <span className="block font-semibold">Split by part of day</span>
+          <span className="block text-ink-3">A line for Morning, Afternoon, Evening and Anytime between the cards.</span>
+        </span>
+        <input type="checkbox" role="switch" checked={dayParts} onChange={(e) => setDayParts(e.target.checked)} className="peer sr-only" />
+        <span
+          aria-hidden
+          className="relative h-6 w-10 shrink-0 rounded-full bg-line transition-colors peer-checked:bg-accent peer-focus-visible:ring-2 peer-focus-visible:ring-accent after:absolute after:top-0.5 after:left-0.5 after:size-5 after:rounded-full after:bg-surface after:shadow-card after:transition-transform peer-checked:after:translate-x-4"
+        />
+      </label>
 
       <p className="mt-6 text-xs font-semibold text-ink-2">Your data</p>
       <p className="mt-1 text-sm text-ink-3">Saved in this browser on this device only. No account, nothing is sent anywhere.</p>

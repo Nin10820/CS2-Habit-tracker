@@ -1,25 +1,31 @@
-import { GROUPS } from "../config/groups"
-import { addDays, weekdayId, type DayKey } from "./date"
-import type { AppData, DayBlock, DayItem } from "./types"
+import { addDays, type DayKey } from "./date"
+import { groupItemId, pickTasks, plansOn, SINGLE, toDef } from "./plan"
+import type { AppData, DayBlock, DayItem, GroupDef } from "./types"
 
-const groupById = new Map(GROUPS.map((g) => [g.id, g]))
+/** Your groups, ready for the views, by id. "" is the built-in single-card group. */
+export function groupDefs(data: AppData): Map<string, GroupDef> {
+  return new Map<string, GroupDef>([["", SINGLE], ...data.groups.map((g) => [g.id, toDef(g)] as const)])
+}
 
-/** Config habits scheduled on this weekday, plus the day's one-off tasks, sorted by time. */
+/** Tasks picked by the groups planned on this day, plus the day's one-off tasks, sorted by time. */
 export function itemsForDay(data: AppData, day: DayKey): DayItem[] {
-  const wd = weekdayId(day)
+  const defs = groupDefs(data)
   const items: DayItem[] = []
-  for (const g of GROUPS) {
-    for (const h of g.habits) {
-      if (h.days && !h.days.includes(wd)) continue
-      // Habits in a group follow the group's time; standalone ones have their own.
-      const time = g.standalone ? h.time : g.time
-      items.push({ kind: "habit", id: h.id, name: h.name, time, minutes: h.minutes, group: g, done: !!data.checks[h.id]?.[day] })
+  for (const g of data.groups) {
+    if (!plansOn(data, g.id, day).length) continue
+    const def = defs.get(g.id)!
+    for (const t of pickTasks(data, g, day)) {
+      const id = groupItemId(g.id, t.id)
+      // Tasks in a group follow the group's time; in a standalone group each has its own.
+      const time = g.standalone ? t.time : g.time
+      items.push({ kind: "habit", id, name: t.name, time, minutes: t.minutes, group: def, done: !!data.checks[id]?.[day] })
     }
   }
   for (const t of data.tasks) {
     if (t.day !== day) continue
-    const g = groupById.get(t.group) ?? GROUPS[0]
-    items.push({ kind: "task", id: t.id, name: t.name, time: t.time, minutes: t.minutes, group: g, done: t.done })
+    const g = defs.get(t.group) ?? SINGLE
+    // A one-off task in a group follows the group's card time unless it has its own.
+    items.push({ kind: "task", id: t.id, name: t.name, time: t.time ?? (g.standalone ? undefined : g.time), minutes: t.minutes, group: g, done: t.done })
   }
   return items.sort((a, b) => (a.time ?? "99:99").localeCompare(b.time ?? "99:99"))
 }
@@ -36,9 +42,10 @@ export function blocksForDay(data: AppData, day: DayKey): DayBlock[] {
   const items = itemsForDay(data, day)
   const changed = data.times[day] ?? {}
   const blocks: DayBlock[] = []
-  for (const g of GROUPS) {
+  for (const g of groupDefs(data).values()) {
     const mine = items.filter((i) => i.group.id === g.id)
-    if (!mine.length) continue
+    // A planned group with an empty list still gets its card, so you can see it and fill it in.
+    if (!mine.length && (g.standalone || !plansOn(data, g.id, day).length)) continue
     if (g.standalone) {
       for (const item of mine) {
         const key = singleKey(item)

@@ -7,20 +7,22 @@
   --font-title: "Bricolage Grotesque", system-ui, sans-serif;
   --font-main: "Montserrat", system-ui, sans-serif;
 
-  --bg: #f5f5f2;
+  /* Flat and light: white page, cards outlined by a 2px soft line, almost no shadow. */
+  --bg: #fcfcfb;
   --surface: #ffffff;
-  --surface-2: #efefea;
-  --border: #e4e4de;
-  --text: #16181d;
-  --text-2: #4f5560;
-  --text-3: #7d838d;
+  --surface-2: #f6f5f4;
+  --border: #ebe9e6;
+  --card-line: #e9e6e3;
+  --text: #111717;
+  --text-2: #363636;
+  --text-3: #85888c;
   --accent: #2f7d5b;
   --accent-soft: #e2f0e8;
   --on-accent: #ffffff;
   --flame: #d9601f;
   --danger: #c4321f;
   --overlay: rgb(15 17 19 / 40%);
-  --shadow: 0 1px 2px rgb(22 24 29 / 5%), 0 4px 16px rgb(22 24 29 / 5%);
+  --shadow: 0 2px 8px 1px rgb(10 10 10 / 3%);
 
   /* Habit colours */
   --h-green: #2f9e6a;
@@ -41,6 +43,7 @@
     --surface: #181b1f;
     --surface-2: #22262b;
     --border: #2c3137;
+    --card-line: #262a30;
     --text: #f1f2f4;
     --text-2: #b1b7c0;
     --text-3: #7f8691;
@@ -70,6 +73,7 @@
   --surface: #181b1f;
   --surface-2: #22262b;
   --border: #2c3137;
+  --card-line: #262a30;
   --text: #f1f2f4;
   --text-2: #b1b7c0;
   --text-3: #7f8691;

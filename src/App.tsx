@@ -1,17 +1,22 @@
-import { ChartBar, GearSix, Kanban, Moon, SidebarSimple, Sun, Timer as TimerIcon } from "@phosphor-icons/react"
-import { useEffect, useState, type ComponentType } from "react"
+import { ChartBar, GearSix, Kanban, Moon, Plus, SidebarSimple, Sun, Timer as TimerIcon } from "@phosphor-icons/react"
+import { useEffect, useRef, useState, type ComponentType } from "react"
 import { GroupCard } from "./components/GroupCard"
 import { ProgressPanel } from "./components/ProgressPanel"
 import { SettingsSheet } from "./components/SettingsSheet"
-import { TaskSheet } from "./components/TaskSheet"
+import { DayGroupSheet } from "./components/DayGroupSheet"
+import { DocSheet } from "./components/DocSheet"
+import { RoutineCard, RoutineEditSheet, RoutineLogSheet, type RoutineEntry } from "./components/Routine"
+import { GroupSheet } from "./components/GroupSheet"
+import { AddSheet, TaskSheet } from "./components/TaskSheet"
 import { MiniPlayer, QuickTimer, useFocusTimer, type FocusTask } from "./components/Timer"
 import { WeekBoard } from "./components/WeekBoard"
-import { GROUPS } from "./config/groups"
 import { todayKey, type DayKey } from "./lib/date"
-import { itemsForDay } from "./lib/stats"
+import { dueItems, routineDay, suggestTime } from "./lib/routine"
+import { groupDefs, itemsForDay } from "./lib/stats"
 import { useStore } from "./lib/store"
+import { useDayParts } from "./lib/prefs"
 import { useTheme } from "./lib/theme"
-import type { DayItem, FocusItem, Task } from "./lib/types"
+import type { DayItem, FocusItem, Group, RoutineItem, Task } from "./lib/types"
 
 /** Below 1280px the three columns become tabs. */
 type Tab = "tasks" | "focus" | "progress"
@@ -50,6 +55,25 @@ function useWide() {
   return wide
 }
 
+/** Routine moments you pressed "Later" on, as "day:id". Kept in this browser only. */
+const LATER_KEY = "habit-tracker:routine-later"
+function readLater(): Set<string> {
+  try {
+    return new Set(JSON.parse(localStorage.getItem(LATER_KEY) ?? "[]") as string[])
+  } catch {
+    return new Set()
+  }
+}
+function addLater(keys: string[]) {
+  try {
+    // Only the last few days matter.
+    const all = [...readLater(), ...keys].slice(-30)
+    localStorage.setItem(LATER_KEY, JSON.stringify(all))
+  } catch {
+    /* ignore */
+  }
+}
+
 /** Open/closed state of a side panel, remembered in this browser. */
 function usePanel(name: string) {
   const key = `habit-tracker:panel-${name}`
@@ -72,7 +96,19 @@ function usePanel(name: string) {
 
 type FocusRef = { day: DayKey; groupId?: string; item?: { kind: DayItem["kind"]; id: string } }
 
-type SheetState ={ kind: "add"; day: DayKey } | { kind: "edit"; task: Task } | { kind: "settings" } | null
+type SheetState =
+  | { kind: "add"; day: DayKey; group?: string }
+  | { kind: "edit"; task: Task }
+  | { kind: "settings" }
+  /** Make or edit a group. `back` returns to that day's Add sheet afterwards. */
+  | { kind: "group"; group?: Group; back?: DayKey }
+  | { kind: "dayGroup"; groupId: string; day: DayKey }
+  /** A group's context and task list (the expand button). */
+  | { kind: "doc"; groupId: string }
+  /** Log routine times. `auto` is the one that opens by itself in the morning / at night. */
+  | { kind: "routineLog"; entries: RoutineEntry[]; auto?: boolean; future?: boolean }
+  | { kind: "routineEdit" }
+  | null
 
 const iconBtn = "press grid size-10 shrink-0 place-items-center rounded-full text-ink-2"
 
@@ -81,6 +117,7 @@ export default function App() {
   const { data } = store
   const today = useToday()
   const [theme, setTheme, isDark] = useTheme()
+  const [dayParts, setDayParts] = useDayParts()
   const [tab, setTab] = useState<Tab>("tasks")
   const [sheet, setSheet] = useState<SheetState>(null)
   const [leftOpen, setLeftOpen] = usePanel("left")
@@ -96,6 +133,45 @@ export default function App() {
     if (task) setSheet({ kind: "edit", task })
   }
   const todayItems = itemsForDay(data, today)
+  const defs = groupDefs(data)
+
+  // Routine: the form to log a moment's time, filled in with now (morning) or your usual time (evening).
+  const entryFor = (item: RoutineItem, day: DayKey): RoutineEntry => ({
+    item,
+    day,
+    suggested: suggestTime(data, item, day, new Date()),
+    logged: data.routine.log[item.id]?.[day],
+  })
+  const logRoutine = (item: RoutineItem, day: DayKey) => setSheet({ kind: "routineLog", entries: [entryFor(item, day)], future: day > today })
+
+  // In the morning (and at night) the form opens by itself for moments not logged yet, once per day unless logged.
+  const latest = useRef({ data, sheet })
+  latest.current = { data, sheet }
+  useEffect(() => {
+    const ask = () => {
+      const { data: d, sheet: open } = latest.current
+      if (open || document.visibilityState !== "visible") return
+      const now = new Date()
+      const due = dueItems(d, now, readLater())
+      if (!due.length) return
+      setSheet({
+        kind: "routineLog",
+        auto: true,
+        entries: due.map((item) => {
+          const day = routineDay(item, now)
+          return { item, day, suggested: suggestTime(d, item, day, now) }
+        }),
+      })
+    }
+    const first = setTimeout(ask, 600)
+    const id = setInterval(ask, 5 * 60_000)
+    document.addEventListener("visibilitychange", ask)
+    return () => {
+      clearTimeout(first)
+      clearInterval(id)
+      document.removeEventListener("visibilitychange", ask)
+    }
+  }, [])
 
   // What the Quick timer is focused on: a group card (its items listed as sub-tasks), optionally one item in it,
   // or a standalone item. Clicking a group title picks the group; clicking an item picks that item.
@@ -216,28 +292,45 @@ export default function App() {
 
       <aside
         aria-label="Focus"
-        className={`${show("focus")} ${pad} ${leftOpen ? "xl:block" : "xl:hidden"} xl:w-[320px] xl:shrink-0 xl:overflow-y-auto xl:border-r xl:border-line xl:px-4 xl:pt-0 xl:pb-6`}
+        className={`${show("focus")} ${pad} ${leftOpen ? "xl:block" : "xl:hidden"} xl:w-[360px] xl:shrink-0 xl:overflow-y-auto xl:border-r xl:border-line xl:px-4 xl:pt-0 xl:pb-6`}
       >
         <div className="flex items-center pb-4 xl:h-16 xl:pb-0">
           <h2 className="text-2xl font-semibold">Focus</h2>
         </div>
-        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-1">
+        <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-1">
           <QuickTimer
             task={focusTask}
             timer={timer}
             {...focusHandlers}
             onClearTask={() => setFocus(null)}
           />
-          {GROUPS.filter((g) => !g.standalone).map((g) => (
+          {/* A line between the focus timer and your lists. */}
+          <hr className="border-line md:col-span-2 xl:col-span-1" />
+          <RoutineCard
+            data={data}
+            today={today}
+            onToggleToday={(i, on) => store.setRoutineOnDay(i.id, today, on)}
+            onCreate={store.createRoutine}
+            onEdit={() => setSheet({ kind: "routineEdit" })}
+          />
+          {data.groups.map((g) => (
             <GroupCard
               key={g.id}
-              group={g}
+              group={defs.get(g.id)!}
+              onOpen={() => setSheet({ kind: "doc", groupId: g.id })}
+              onPlanToday={() => store.addPlan(g.id, today)}
               items={todayItems.filter((i) => i.group.id === g.id)}
               onToggle={(i) => toggle(i, today)}
               onFocus={(i) => pickFocus(i, today)}
               focusedId={focus?.day === today && focused ? `${focused.kind}:${focused.id}` : undefined}
             />
           ))}
+          <button
+            onClick={() => setSheet({ kind: "group" })}
+            className="press flex h-11 items-center justify-center gap-2 rounded-[20px] border border-dashed border-line text-sm font-semibold text-ink-2"
+          >
+            <Plus size={18} weight="bold" /> New group
+          </button>
         </div>
       </aside>
 
@@ -250,6 +343,10 @@ export default function App() {
           onEdit={edit}
           onFocus={pickFocus}
           onFocusGroup={pickGroup}
+          onGroupMenu={(groupId, day) => setSheet({ kind: "dayGroup", groupId, day })}
+          onRoutine={logRoutine}
+          onDropRoutine={(id, day) => store.setRoutineOnDay(id, day, true)}
+          dayParts={dayParts}
           onSetTime={store.setTime}
           focusKey={focusKey}
           leading={
@@ -317,17 +414,82 @@ export default function App() {
         />
       )}
 
-      {sheet?.kind === "add" && <TaskSheet day={sheet.day} onSave={store.addTask} onClose={() => setSheet(null)} />}
+      {sheet?.kind === "add" && (
+        <AddSheet
+          key={`${sheet.day}:${sheet.group ?? ""}`}
+          day={sheet.day}
+          data={data}
+          initialGroup={sheet.group}
+          onAddPlan={(group, repeat) => store.addPlan(group, sheet.day, repeat)}
+          onAddTask={store.addTask}
+          onNewGroup={() => setSheet({ kind: "group", back: sheet.day })}
+          onClose={() => setSheet(null)}
+        />
+      )}
       {sheet?.kind === "edit" && (
         <TaskSheet
-          day={sheet.task.day}
           task={sheet.task}
+          groups={data.groups}
           onSave={(t) => store.updateTask(sheet.task.id, t)}
           onDelete={() => store.deleteTask(sheet.task.id)}
           onClose={() => setSheet(null)}
         />
       )}
-      {sheet?.kind === "settings" && <SettingsSheet store={store} theme={theme} setTheme={setTheme} onClose={() => setSheet(null)} />}
+      {sheet?.kind === "group" && (
+        <GroupSheet
+          group={sheet.group}
+          onSave={(g) => {
+            store.saveGroup(g)
+            // Made from a day's Add sheet: go back there with the new group picked.
+            if (sheet.back) setSheet({ kind: "add", day: sheet.back, group: g.id })
+          }}
+          onDelete={sheet.group && (() => store.deleteGroup(sheet.group!.id))}
+          onClose={() => setSheet((s) => (s?.kind === "group" ? (s.back ? { kind: "add", day: s.back } : null) : s))}
+        />
+      )}
+      {sheet?.kind === "routineLog" && (
+        <RoutineLogSheet
+          entries={sheet.entries}
+          auto={sheet.auto}
+          future={sheet.future}
+          onSave={(values) => values.forEach((v) => store.logRoutine(v.item.id, v.day, v.time))}
+          onClear={(e) => store.logRoutine(e.item.id, e.day, null)}
+          onRemove={(e) => {
+            store.setRoutineOnDay(e.item.id, e.day, false)
+            store.logRoutine(e.item.id, e.day, null)
+          }}
+          onLater={() => addLater(sheet.entries.map((e) => `${e.day}:${e.item.id}`))}
+          onClose={() => {
+            // Closing the form that opened by itself also means "not now": it won't ask again today.
+            if (sheet.auto) addLater(sheet.entries.map((e) => `${e.day}:${e.item.id}`))
+            setSheet(null)
+          }}
+        />
+      )}
+      {sheet?.kind === "routineEdit" && <RoutineEditSheet items={data.routine.items} onSave={store.saveRoutine} onClose={() => setSheet(null)} />}
+      {sheet?.kind === "doc" &&
+        (() => {
+          const g = data.groups.find((x) => x.id === sheet.groupId)
+          return g && <DocSheet group={defs.get(g.id)!} onEdit={() => setSheet({ kind: "group", group: g })} onClose={() => setSheet(null)} />
+        })()}
+      {sheet?.kind === "dayGroup" &&
+        (() => {
+          const g = data.groups.find((x) => x.id === sheet.groupId)
+          return (
+            g && (
+              <DayGroupSheet
+                group={g}
+                day={sheet.day}
+                data={data}
+                onEdit={() => setSheet({ kind: "group", group: g })}
+                onRemoveDay={() => store.removeFromDay(g.id, sheet.day)}
+                onStopRepeat={() => store.stopRepeat(g.id, sheet.day)}
+                onClose={() => setSheet(null)}
+              />
+            )
+          )
+        })()}
+      {sheet?.kind === "settings" && <SettingsSheet store={store} theme={theme} setTheme={setTheme} dayParts={dayParts} setDayParts={setDayParts} onClose={() => setSheet(null)} />}
     </div>
   )
 }

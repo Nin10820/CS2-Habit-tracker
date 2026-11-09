@@ -1,9 +1,47 @@
 import { ArrowCounterClockwise, Check, Clock, DotsThree, Moon, PencilSimple, Plus, Sun, SunHorizon } from "@phosphor-icons/react"
-import { Fragment, useState, type DragEvent } from "react"
+import { Fragment, useState, type DragEvent, type KeyboardEvent } from "react"
 import { dayOfMonth, formatDow, type DayKey } from "../lib/date"
 import { colorVar, type DayBlock, type DayItem, type RoutineItem } from "../lib/types"
 import { dayPart, type DayPart } from "../lib/prefs"
 import { ROUTINE_DRAG } from "./Routine"
+
+/** Drag data for a card moved to another day: a whole group card, or a one-off task's card. */
+export const CARD_DRAG = "application/x-day-card"
+export type CardDrag = { from: DayKey; kind: "group" | "task"; id: string }
+
+/** Today's column tint: opaque, so the pinned heading can use it too and hide the cards scrolling under. */
+const TODAY_BG = "color-mix(in oklab, var(--accent) 6%, var(--bg))"
+
+/**
+ * Props for a clickable title inside a draggable card. Chrome won't start a drag from a <button>,
+ * so titles are elements with the button role instead: clicks, Enter and Space still work.
+ */
+const pressable = (onPress: () => void) => ({
+  role: "button" as const,
+  tabIndex: 0,
+  onClick: onPress,
+  onKeyDown: (e: KeyboardEvent<HTMLElement>) => {
+    if (e.key === "Enter" || e.key === " ") {
+      e.preventDefault()
+      onPress()
+    }
+  },
+})
+
+/** Makes a card draggable to another day; it fades while it's being dragged. */
+function cardDrag(data: CardDrag) {
+  return {
+    draggable: true,
+    onDragStart: (e: DragEvent<HTMLElement>) => {
+      e.dataTransfer.setData(CARD_DRAG, JSON.stringify(data))
+      e.dataTransfer.effectAllowed = "move"
+      e.currentTarget.style.opacity = "0.45"
+    },
+    onDragEnd: (e: DragEvent<HTMLElement>) => {
+      e.currentTarget.style.opacity = ""
+    },
+  }
+}
 
 type ItemHandlers = {
   onToggle: (item: DayItem) => void
@@ -26,6 +64,7 @@ export function DayColumn({
   routine = [],
   onRoutine,
   onDropRoutine,
+  onDropCard,
   onSetTime,
   focusKey,
   className = "",
@@ -49,6 +88,8 @@ export function DayColumn({
   onRoutine?: (item: RoutineItem) => void
   /** A routine moment dragged here from the Routine card. */
   onDropRoutine?: (id: string) => void
+  /** A card dragged here from another day. */
+  onDropCard?: (card: CardDrag) => void
   /** Change a card's time for this day; null goes back to the expected time. */
   onSetTime: (key: string, time: string | null) => void
   /** "day:kind:id" of the focused item, to highlight it. */
@@ -65,20 +106,24 @@ export function DayColumn({
   const nowAt = now && isToday ? blocks.findIndex((b) => (b.time ?? "99:99") > now) : -2
   const marker = nowAt === -2 ? -1 : nowAt === -1 ? blocks.length : nowAt
   const handlers: ItemHandlers = { onToggle, onEdit, onFocus }
-  // Highlight while a routine moment is dragged over this day.
+  // Highlight while a routine moment or another day's card is dragged over this day.
   const [dropping, setDropping] = useState(false)
   const isRoutine = (e: DragEvent<HTMLElement>) => e.dataTransfer.types.includes(ROUTINE_DRAG)
+  const isCard = (e: DragEvent<HTMLElement>) => e.dataTransfer.types.includes(CARD_DRAG)
   const isFocused = (i: DayItem) => focusKey === `${day}:${i.kind}:${i.id}`
 
   return (
     <section
       data-day={day}
       aria-label={`${formatDow(day)} ${dayOfMonth(day)}`}
-      className={`@container flex flex-col gap-2 rounded-2xl transition-shadow ${dropping ? "ring-2 ring-accent ring-offset-4 ring-offset-bg" : ""} ${className}`}
+      style={isToday ? { background: TODAY_BG } : undefined}
+      className={`@container flex flex-col gap-2 rounded-[22px] px-2 pb-2 transition-shadow ${dropping ? "ring-2 ring-accent" : ""} ${className}`}
       onDragOver={(e) => {
-        if (!onDropRoutine || !isRoutine(e)) return
+        const routine = !!onDropRoutine && isRoutine(e)
+        const card = !!onDropCard && isCard(e)
+        if (!routine && !card) return
         e.preventDefault()
-        e.dataTransfer.dropEffect = "copy"
+        e.dataTransfer.dropEffect = card ? "move" : "copy"
         setDropping(true)
       }}
       onDragLeave={(e) => {
@@ -90,12 +135,25 @@ export function DayColumn({
         if (id && onDropRoutine) {
           e.preventDefault()
           onDropRoutine(id)
+          return
+        }
+        const raw = e.dataTransfer.getData(CARD_DRAG)
+        if (raw && onDropCard) {
+          e.preventDefault()
+          try {
+            const card = JSON.parse(raw) as CardDrag
+            if (card.from !== day) onDropCard(card)
+          } catch {
+            /* not ours */
+          }
         }
       }}
     >
-      {/* Flat day heading: weekday, then the date; today's date sits in a filled circle. */}
-      {/* Pinned while the cards scroll: the day heading and the routine buttons. */}
-      <div className="sticky top-14 z-20 -mx-1 flex flex-col gap-2 bg-bg px-1 pt-3 pb-2 xl:top-0">
+      {/* Pinned while the cards scroll: the day heading and the routine buttons (today's in its tint). */}
+      <div
+        style={isToday ? { background: TODAY_BG } : undefined}
+        className={`sticky top-14 z-20 -mx-2 flex flex-col gap-2 rounded-t-[22px] px-2 pt-3 pb-2 xl:top-0 ${isToday ? "" : "bg-bg"}`}
+      >
       {showHeader && (
       <header className="flex flex-col items-center pb-1">
         {/* Today sits in a soft box. */}
@@ -164,11 +222,23 @@ export function DayColumn({
                 groupFocused={focusKey === `${day}:group:${b.group.id}`}
                 onFocusGroup={() => onFocusGroup(b.group.id)}
                 onMenu={() => onGroupMenu(b.group.id)}
+                drag={onDropCard ? cardDrag({ from: day, kind: "group", id: b.group.id }) : undefined}
                 onSetTime={(t) => onSetTime(b.key, t)}
                 {...handlers}
               />
             ) : (
-              <SingleBlock block={b} future={future} focused={isFocused(b.item)} onSetTime={(t) => onSetTime(b.key, t)} {...handlers} />
+              <SingleBlock
+                block={b}
+                future={future}
+                focused={isFocused(b.item)}
+                onSetTime={(t) => onSetTime(b.key, t)}
+                drag={
+                  onDropCard
+                    ? cardDrag(b.item.kind === "task" ? { from: day, kind: "task", id: b.item.id } : { from: day, kind: "group", id: b.item.group.id })
+                    : undefined
+                }
+                {...handlers}
+              />
             )}
           </Fragment>
         ))}
@@ -298,10 +368,15 @@ function ItemRow({
       <span className="hc-soft grid size-7 shrink-0 place-items-center rounded-full" aria-hidden>
         <Icon size={14} className="hc-text" />
       </span>
-      <button onClick={onFocus} aria-current={focused ? "true" : undefined} title="Focus on this" className="min-w-0 flex-1 text-left">
+      <div
+        {...pressable(onFocus)}
+        aria-current={focused ? "true" : undefined}
+        title="Focus on this"
+        className="min-w-0 flex-1 cursor-pointer text-left outline-none focus-visible:ring-2 focus-visible:ring-accent"
+      >
         <span className={`block text-[13.5px] leading-5 font-medium break-words ${item.done ? "text-ink-3 line-through" : ""}`}>{item.name}</span>
         {item.minutes ? <span className="mt-0.5 block text-xs leading-4 text-ink-3 tabular-nums">{fmtMinutes(item.minutes)}</span> : null}
-      </button>
+      </div>
       {item.kind === "task" && (
         <button onClick={onEdit} aria-label={`Edit ${item.name}`} title="Edit task" className="press grid size-7 shrink-0 place-items-center rounded-full text-ink-3">
           <PencilSimple size={13} />
@@ -325,12 +400,15 @@ function GroupBlock({
   groupFocused,
   onFocusGroup,
   onMenu,
+  drag,
   onSetTime,
   onToggle,
   onEdit,
   onFocus,
 }: ItemHandlers & {
   block: Extract<DayBlock, { kind: "group" }>
+  /** Drag handlers to move the card to another day. */
+  drag?: ReturnType<typeof cardDrag>
   future: boolean
   isFocused: (i: DayItem) => boolean
   groupFocused: boolean
@@ -344,20 +422,20 @@ function GroupBlock({
   const done = items.filter((i) => i.done).length
 
   return (
-    <li style={{ ["--hc" as string]: colorVar(group.color) }} className={cardFrame(groupFocused)}>
+    <li style={{ ["--hc" as string]: colorVar(group.color) }} className={`${cardFrame(groupFocused)} ${drag ? "cursor-grab select-none active:cursor-grabbing" : ""}`} {...drag}>
       <div className="hc-soft flex items-center gap-1.5 py-2.5 pr-1.5 pl-3.5">
-        <button
-          onClick={onFocusGroup}
+        <div
+          {...pressable(onFocusGroup)}
           aria-current={groupFocused ? "true" : undefined}
           title={total ? `Focus on this group · ${fmtMinutes(total)} in all` : "Focus on this group"}
-          className="flex min-w-0 flex-1 items-center gap-2 text-left"
+          className="flex min-w-0 flex-1 cursor-pointer items-center gap-2 text-left outline-none focus-visible:ring-2 focus-visible:ring-accent"
         >
           <Icon size={15} className="hc-text shrink-0" aria-hidden />
           <span className={bandLabel}>{group.label}</span>
           <span className="-ml-0.5 shrink-0 text-xs text-ink-2 tabular-nums">
             ({done}/{items.length})
           </span>
-        </button>
+        </div>
         <TimeChip time={block.time} expected={block.expected} onChange={onSetTime} />
         <button onClick={onMenu} aria-label={`${group.label} options`} title="Group options" className="press -ml-1 grid size-6 shrink-0 place-items-center rounded-full text-ink-2">
           <DotsThree size={16} weight="bold" />
@@ -392,12 +470,14 @@ function SingleBlock({
   block,
   future,
   focused,
+  drag,
   onSetTime,
   onToggle,
   onEdit,
   onFocus,
 }: ItemHandlers & {
   block: Extract<DayBlock, { kind: "single" }>
+  drag?: ReturnType<typeof cardDrag>
   future: boolean
   focused: boolean
   onSetTime: (t: string | null) => void
@@ -406,7 +486,7 @@ function SingleBlock({
   const Icon = item.group.icon
 
   return (
-    <li style={{ ["--hc" as string]: colorVar(item.group.color) }} className={cardFrame(focused)}>
+    <li style={{ ["--hc" as string]: colorVar(item.group.color) }} className={`${cardFrame(focused)} ${drag ? "cursor-grab select-none active:cursor-grabbing" : ""}`} {...drag}>
       <div className="hc-soft flex items-center gap-2 py-2.5 pr-2.5 pl-3.5">
         <Icon size={15} className="hc-text shrink-0" aria-hidden />
         <span className={`${bandLabel} flex-1`}>{item.group.label}</span>

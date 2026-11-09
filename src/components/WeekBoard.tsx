@@ -6,17 +6,17 @@ import { routineOn } from "../lib/routine"
 import { blocksForDay, itemsForDay } from "../lib/stats"
 import type { AppData, DayItem, RoutineItem } from "../lib/types"
 import { MonthGrid, WeekGrid, type OpenBlock } from "./CalendarViews"
-import { DayColumn } from "./DayColumn"
+import { DayColumn, type CardDrag } from "./DayColumn"
 import { Ring } from "./ui"
 
 type View = "days" | "week" | "month"
 const VIEWS: [View, string][] = [
-  ["days", "4 days"],
+  ["days", "7 days"],
   ["week", "Week"],
   ["month", "Month"],
 ]
 
-/** 4 days (the default), Week or Month (from 768px), remembered in this browser. */
+/** 7 days from yesterday (the default), Week or Month (from 768px), remembered in this browser. */
 function useView() {
   const KEY = "habit-tracker:view-v2"
   const [view, setView] = useState<View>(() => {
@@ -38,7 +38,7 @@ function useView() {
 }
 
 /**
- * "My tasks". From 768px: 4 days (yesterday, today and the next two) as card columns, or Week and
+ * "My tasks". From 768px: 7 days (yesterday, today and the next five) as card columns, or Week and
  * Month as Apple-style calendars. On phones a week strip picks one day to show.
  */
 export function WeekBoard({
@@ -52,6 +52,7 @@ export function WeekBoard({
   onGroupMenu,
   onRoutine,
   onDropRoutine,
+  onDropCard,
   dayParts = false,
   onSetTime,
   focusKey,
@@ -71,6 +72,8 @@ export function WeekBoard({
   onRoutine: (item: RoutineItem, day: DayKey) => void
   /** A routine moment dragged from the Routine card onto a day. */
   onDropRoutine: (id: string, day: DayKey) => void
+  /** A card dragged from one day onto another. */
+  onDropCard: (card: CardDrag, day: DayKey) => void
   /** Split each day into Morning / Afternoon / Evening / Anytime (Settings). */
   dayParts?: boolean
   onSetTime: (day: DayKey, key: string, time: string | null) => void
@@ -79,7 +82,7 @@ export function WeekBoard({
   leading?: ReactNode
   trailing?: ReactNode
 }) {
-  // The day the views are built around: 4 days start the day before it; Week and Month contain it.
+  // The day the views are built around: the 7 days start the day before it; Week and Month contain it.
   const [anchor, setAnchor] = useState<DayKey>(today)
   const [picked, setPicked] = useState<DayKey>(today)
   const [view, setView] = useView()
@@ -88,10 +91,11 @@ export function WeekBoard({
 
   const weekStart = startOfWeek(anchor)
   const days = weekOf(anchor) // phone strip and Week view
-  const fourDays = range(addDays(anchor, -1), addDays(anchor, 2))
+  const DAY_COUNT = 7
+  const cardDays = range(addDays(anchor, -1), addDays(anchor, DAY_COUNT - 2))
   const day = days.includes(picked) ? picked : days[0]
 
-  // When the 4 days change (load, arrows, "Today"), start from the first column, yesterday,
+  // When the days change (load, arrows, "Today"), start from the first column, yesterday,
   // in case the columns are wider than the screen. (Columns are all as tall as the longest, so
   // each one's pinned heading stays up while the cards scroll.)
   const [scrollKey, setScrollKey] = useState(0)
@@ -104,23 +108,23 @@ export function WeekBoard({
     setPicked(today)
     setScrollKey((k) => k + 1)
   }
-  // Arrows move 4 days, a week or a month. On phones (week strip) they always move a week.
+  // Arrows move 7 days, a week or a month. On phones (week strip) they always move a week.
   const shift = (n: number) => {
     const phone = !window.matchMedia("(min-width: 768px)").matches
-    const next = phone || view === "week" ? addDays(anchor, n * 7) : view === "month" ? addMonths(anchor, n) : addDays(anchor, n * 4)
+    const next = phone || view === "week" ? addDays(anchor, n * 7) : view === "month" ? addMonths(anchor, n) : addDays(anchor, n * DAY_COUNT)
     setAnchor(next)
     const week = weekOf(next)
     setPicked(week.includes(today) ? today : week[0])
   }
-  // A day picked in Week or Month opens the 4 days around it.
+  // A day picked in Week or Month opens the card days around it.
   const openDay = (d: DayKey) => {
     setAnchor(d)
     setPicked(d)
     setView("days")
   }
   const openBlock: OpenBlock = (b, d) => (b.kind === "group" ? onFocusGroup(b.group.id, d) : onFocus(b.item, d))
-  const unit = view === "month" ? "month" : view === "week" ? "week" : "4 days"
-  const title = view === "month" ? formatMonthYear(anchor) : view === "week" ? formatWeekMonths(weekStart) : formatWeekMonths(fourDays[0], 4)
+  const unit = view === "month" ? "month" : view === "week" ? "week" : "7 days"
+  const title = view === "month" ? formatMonthYear(anchor) : view === "week" ? formatWeekMonths(weekStart) : formatWeekMonths(cardDays[0], DAY_COUNT)
   const routineFor = (d: DayKey) => routineOn(data, d).map((item) => ({ item, time: data.routine.log[item.id]?.[d] }))
 
   const btn = "press flex h-10 items-center gap-1.5 rounded-xl px-3 text-sm font-semibold"
@@ -228,18 +232,19 @@ export function WeekBoard({
           routine={routineFor(day)}
           onRoutine={(i) => onRoutine(i, day)}
           onDropRoutine={(id) => onDropRoutine(id, day)}
+          onDropCard={(c) => onDropCard(c, day)}
           dayParts={dayParts}
           focusKey={focusKey}
         />
       </div>
 
-      {/* 768px+: 4 day columns of cards, or the Week / Month calendar */}
+      {/* 768px+: 7 day columns of cards (scrolling sideways), or the Week / Month calendar */}
       {view === "days" ? (
         <div
           ref={scroller}
-          className="mt-5 hidden snap-x scroll-px-4 items-stretch gap-6 overflow-x-auto pb-3 md:flex xl:mt-0 xl:min-h-0 xl:flex-1 xl:overflow-auto xl:px-4 xl:pt-0 xl:pb-4"
+          className="mt-5 hidden snap-x scroll-px-4 items-stretch gap-6 overflow-x-auto pb-3 md:flex xl:mt-0 xl:min-h-0 xl:flex-1 xl:overflow-auto xl:px-4 xl:pt-0 xl:pb-[calc(var(--player-space)+16px)]"
         >
-          {fourDays.map((k) => (
+          {cardDays.map((k) => (
             <DayColumn
               key={k}
               className="min-w-[296px] flex-1 snap-start"
@@ -257,6 +262,7 @@ export function WeekBoard({
               routine={routineFor(k)}
               onRoutine={(i) => onRoutine(i, k)}
               onDropRoutine={(id) => onDropRoutine(id, k)}
+              onDropCard={(c) => onDropCard(c, k)}
               dayParts={dayParts}
               focusKey={focusKey}
             />

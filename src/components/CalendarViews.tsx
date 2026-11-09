@@ -118,7 +118,7 @@ export function WeekGrid({
         </div>
       )}
 
-      <div ref={scroller} className="relative min-h-0 flex-1 overflow-y-auto">
+      <div ref={scroller} className="relative min-h-0 flex-1 overflow-y-auto xl:pb-[var(--player-space)]">
         <div className={`${cols} relative`} style={{ height: 24 * HOUR }}>
           {/* Hour labels */}
           <div className="relative">
@@ -189,7 +189,7 @@ export function MonthGrid({ month, today, data, onPickDay }: { month: DayKey; to
   const MAX = 3
 
   return (
-    <div className="flex min-w-[700px] flex-1 flex-col xl:min-h-0">
+    <div className="flex min-w-[700px] flex-1 flex-col xl:min-h-0 xl:pb-[var(--player-space)]">
       <div className="grid grid-cols-7 border-b border-line">
         {weeks[0].map((d) => (
           <span key={d} className="py-2 pr-2 text-right text-xs text-ink-2">

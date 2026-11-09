@@ -295,6 +295,27 @@ export function useStore() {
     }))
   }, [])
 
+  /**
+   * Move a group from one day to another (a card dragged across days): it leaves `from` (a repeating plan
+   * skips that day) and is put on `to` (un-skipping it there, or a one-day plan), with its one-off tasks.
+   */
+  const moveGroup = useCallback((group: string, from: DayKey, to: DayKey) => {
+    if (from === to) return
+    setData((d) => {
+      let plans = d.plans.flatMap((p) => {
+        if (p.group !== group || !planOn(p, from)) return [p]
+        return p.repeat ? [{ ...p, skip: [...(p.skip ?? []), from] }] : []
+      })
+      if (!plans.some((p) => p.group === group && planOn(p, to))) {
+        const i = plans.findIndex((p) => p.group === group && p.skip?.includes(to) && planOn({ ...p, skip: p.skip.filter((x) => x !== to) }, to))
+        if (i >= 0) plans = plans.map((p, j) => (j === i ? { ...p, skip: p.skip!.filter((x) => x !== to) } : p))
+        else plans = [...plans, { id: newId(), group, from: to }]
+      }
+      const tasks = d.tasks.map((t) => (t.group === group && t.day === from ? { ...t, day: to } : t))
+      return { ...d, plans, tasks }
+    })
+  }, [])
+
   /** Stop a group's repeating plans after this day (the day itself stays). */
   const stopRepeat = useCallback((group: string, day: DayKey) => {
     setData((d) => ({
@@ -360,6 +381,7 @@ export function useStore() {
     deleteGroup,
     addPlan,
     removeFromDay,
+    moveGroup,
     stopRepeat,
   }
 }

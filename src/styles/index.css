@@ -129,6 +129,31 @@ html.scroll-intro::-webkit-scrollbar-thumb {
   transition-duration: 0.08s;
 }
 
+/* "Now playing" bars in the mini player's Up Next. */
+@keyframes eq {
+  0%,
+  100% {
+    transform: scaleY(0.35);
+  }
+  50% {
+    transform: scaleY(1);
+  }
+}
+.eq > span {
+  height: 100%;
+  transform-origin: bottom;
+  animation: eq 0.9s ease-in-out infinite;
+}
+.eq > span:nth-child(2) {
+  animation-delay: -0.3s;
+}
+.eq > span:nth-child(3) {
+  animation-delay: -0.6s;
+}
+.eq-paused > span {
+  animation-play-state: paused;
+}
+
 @keyframes pop {
   0% { transform: scale(0.6); }
   60% { transform: scale(1.12); }
@@ -145,6 +170,7 @@ html.scroll-intro::-webkit-scrollbar-thumb {
   animation: sheet-in 0.22s ease-out;
 }
 @media (prefers-reduced-motion: reduce) {
+  .eq > span,
   .pop,
   .sheet-in {
     animation: none;

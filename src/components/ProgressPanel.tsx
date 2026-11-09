@@ -5,6 +5,7 @@ import { formatDow, weekOf, type DayKey } from "../lib/date"
 import { allHabitsStreak, dayTotals, pct } from "../lib/stats"
 import type { AppData } from "../lib/types"
 import { Bar, Card } from "./ui"
+import { WakeCharts } from "./WakeCharts"
 
 const Label = ({ icon: Icon, children }: { icon: typeof Target; children: string }) => (
   <p className="flex items-center gap-2 text-xs font-semibold tracking-wider text-ink-2 uppercase">
@@ -49,6 +50,7 @@ export function ProgressPanel({ data, today, showTitle = true }: { data: AppData
 
       <WeekBars week={week} today={today} />
       <TrendLine week={week} today={today} />
+      <WakeCharts data={data} today={today} />
 
       <div className="grid grid-cols-2 gap-3">
         <div className="rounded-3xl bg-accent-soft p-4">

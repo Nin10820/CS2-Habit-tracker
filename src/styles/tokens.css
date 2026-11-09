@@ -24,6 +24,9 @@
   --danger: #c4321f;
   /* Calendar "today" and the now line (Week / Month views). */
   --now: #ff3b30;
+  /* Wake-up charts: validated pair (contrast >= 3:1 on the surface; told apart by chart and mark too). */
+  --chart-wake: #a87400;
+  --chart-done: #1f9a5a;
   --overlay: rgb(15 17 19 / 40%);
   --shadow: 0 2px 8px 1px rgb(10 10 10 / 3%);
 
@@ -56,6 +59,8 @@
     --flame: #f2894c;
     --danger: #f97066;
     --now: #ff453a;
+    --chart-wake: #b8860b;
+    --chart-done: #239a62;
     --overlay: rgb(0 0 0 / 60%);
     --shadow: 0 1px 2px rgb(0 0 0 / 30%);
 
@@ -87,6 +92,8 @@
   --flame: #f2894c;
   --danger: #f97066;
   --now: #ff453a;
+  --chart-wake: #b8860b;
+  --chart-done: #239a62;
   --overlay: rgb(0 0 0 / 60%);
   --shadow: 0 1px 2px rgb(0 0 0 / 30%);
 

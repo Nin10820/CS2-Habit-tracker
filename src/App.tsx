@@ -1,4 +1,4 @@
-import { ChartBar, GearSix, Kanban, Moon, Plus, SidebarSimple, Sun, Timer as TimerIcon } from "@phosphor-icons/react"
+import { ChartBar, GearSix, Kanban, Moon, Play, Plus, SidebarSimple, Sun, Timer as TimerIcon } from "@phosphor-icons/react"
 import { useEffect, useRef, useState, type ComponentType } from "react"
 import { GroupCard } from "./components/GroupCard"
 import { ProgressPanel } from "./components/ProgressPanel"
@@ -8,7 +8,7 @@ import { DocSheet } from "./components/DocSheet"
 import { RoutineCard, RoutineEditSheet, RoutineLogSheet, type RoutineEntry } from "./components/Routine"
 import { GroupSheet } from "./components/GroupSheet"
 import { AddSheet, TaskSheet } from "./components/TaskSheet"
-import { MiniPlayer, QuickTimer, useFocusTimer, type FocusTask } from "./components/Timer"
+import { MiniPlayer, useFocusTimer, type FocusTask } from "./components/Timer"
 import { WeekBoard } from "./components/WeekBoard"
 import { todayKey, type DayKey } from "./lib/date"
 import { dueItems, routineDay, suggestTime } from "./lib/routine"
@@ -40,19 +40,6 @@ function useToday() {
     }
   }, [])
   return today
-}
-
-/** True from 1280px, where the side panels replace the tabs. */
-function useWide() {
-  const query = "(min-width: 1280px)"
-  const [wide, setWide] = useState(() => window.matchMedia(query).matches)
-  useEffect(() => {
-    const mq = window.matchMedia(query)
-    const on = () => setWide(mq.matches)
-    mq.addEventListener("change", on)
-    return () => mq.removeEventListener("change", on)
-  }, [])
-  return wide
 }
 
 /** Routine moments you pressed "Later" on, as "day:id". Kept in this browser only. */
@@ -221,13 +208,13 @@ export default function App() {
   }
   const timer = useFocusTimer(focusTask)
 
-  const wide = useWide()
-  const timerOnScreen = wide ? leftOpen : tab === "focus"
-  const showMini = !!focusTask && !timerOnScreen
-  const openTimer = () => (wide ? setLeftOpen(true) : setTab("focus"))
+  // The player bar shows whenever a task is picked, or for a Quick focus session without a task.
+  const [quick, setQuick] = useState(false)
+  const showMini = !!focusTask || quick
   const closeMini = () => {
     if (timer.running) timer.toggle(timer.running)
     setFocus(null)
+    setQuick(false)
   }
 
   const themeBtn = (
@@ -267,7 +254,13 @@ export default function App() {
   const pad = "px-4 pt-4 pb-[calc(96px+env(safe-area-inset-bottom))] sm:px-6 sm:pb-12"
 
   return (
-    <div className={`min-h-dvh xl:flex xl:h-dvh xl:overflow-hidden ${showMini ? "pb-20" : ""}`}>
+    // Room for the player bar: below 1280px the page scrolls, so it gets bottom padding; from 1280px the
+    // columns scroll on their own, so each adds --player-space inside its scroll area instead of the page
+    // shrinking (which left an empty band under everything).
+    <div
+      style={{ ["--player-space" as string]: showMini ? "96px" : "0px" }}
+      className={`min-h-dvh xl:flex xl:h-dvh xl:overflow-hidden ${showMini ? "pb-20 xl:pb-0" : ""}`}
+    >
       {/* Small screens: theme, settings and (from 640px) the tabs. No logo. */}
       <header className="sticky top-0 z-30 flex h-14 items-center gap-2 border-b border-line bg-bg/85 px-4 backdrop-blur-md sm:px-6 xl:hidden">
         <nav aria-label="Main" className="hidden gap-1 rounded-2xl bg-surface-2 p-1 sm:flex">
@@ -292,18 +285,31 @@ export default function App() {
 
       <aside
         aria-label="Focus"
-        className={`${show("focus")} ${pad} ${leftOpen ? "xl:block" : "xl:hidden"} xl:w-[360px] xl:shrink-0 xl:overflow-y-auto xl:border-r xl:border-line xl:px-4 xl:pt-0 xl:pb-6`}
+        className={`${show("focus")} ${pad} ${leftOpen ? "xl:block" : "xl:hidden"} xl:w-[360px] xl:shrink-0 xl:overflow-y-auto xl:border-r xl:border-line xl:px-4 xl:pt-0 xl:pb-[calc(var(--player-space)+24px)]`}
       >
         <div className="flex items-center pb-4 xl:h-16 xl:pb-0">
           <h2 className="text-2xl font-semibold">Focus</h2>
         </div>
         <div className="grid gap-6 md:grid-cols-2 xl:grid-cols-1">
-          <QuickTimer
-            task={focusTask}
-            timer={timer}
-            {...focusHandlers}
-            onClearTask={() => setFocus(null)}
-          />
+          {/* Quick focus: a timer without picking a task. It opens the player bar at the bottom. */}
+          <button
+            onClick={() => {
+              setFocus(null)
+              setQuick(true)
+            }}
+            className="press flex items-center gap-3 rounded-2xl bg-[#17191e] p-2.5 pr-3 text-left text-white"
+          >
+            <span className="grid size-12 shrink-0 place-items-center rounded-2xl bg-white/10">
+              <TimerIcon size={24} weight="fill" />
+            </span>
+            <span className="min-w-0 flex-1">
+              <span className="block text-[15px] font-semibold">Quick focus</span>
+              <span className="block truncate text-[13px] text-white/55">No task needed · or tap any task</span>
+            </span>
+            <span className="flex h-10 shrink-0 items-center gap-1 rounded-xl bg-white px-3 text-sm font-semibold text-[#17191e]">
+              <Play size={14} weight="fill" /> Open
+            </span>
+          </button>
           {/* A line between the focus timer and your lists. */}
           <hr className="border-line md:col-span-2 xl:col-span-1" />
           <RoutineCard
@@ -346,6 +352,7 @@ export default function App() {
           onGroupMenu={(groupId, day) => setSheet({ kind: "dayGroup", groupId, day })}
           onRoutine={logRoutine}
           onDropRoutine={(id, day) => store.setRoutineOnDay(id, day, true)}
+          onDropCard={(c, day) => (c.kind === "task" ? store.updateTask(c.id, { day }) : store.moveGroup(c.id, c.from, day))}
           dayParts={dayParts}
           onSetTime={store.setTime}
           focusKey={focusKey}
@@ -380,7 +387,7 @@ export default function App() {
 
       <aside
         aria-label="Your progress"
-        className={`${show("progress")} ${pad} ${rightOpen ? "xl:block" : "xl:hidden"} xl:w-[360px] xl:shrink-0 xl:overflow-y-auto xl:border-l xl:border-line xl:px-4 xl:pt-0 xl:pb-6`}
+        className={`${show("progress")} ${pad} ${rightOpen ? "xl:block" : "xl:hidden"} xl:w-[360px] xl:shrink-0 xl:overflow-y-auto xl:border-l xl:border-line xl:px-4 xl:pt-0 xl:pb-[calc(var(--player-space)+24px)]`}
       >
         <ProgressPanel data={data} today={today} />
       </aside>
@@ -404,15 +411,7 @@ export default function App() {
         </div>
       </nav>
 
-      {showMini && focusTask && (
-        <MiniPlayer
-          task={focusTask}
-          timer={timer}
-          {...focusHandlers}
-          onClose={closeMini}
-          onExpand={openTimer}
-        />
-      )}
+      {showMini && <MiniPlayer task={focusTask} timer={timer} {...focusHandlers} onClose={closeMini} />}
 
       {sheet?.kind === "add" && (
         <AddSheet

@@ -297,7 +297,7 @@ export default function App() {
         <div className="flex items-center pb-4 xl:h-16 xl:pb-0">
           <h2 className="text-2xl font-semibold">Focus</h2>
         </div>
-        <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-1">
+        <div className="grid gap-6 md:grid-cols-2 xl:grid-cols-1">
           <QuickTimer
             task={focusTask}
             timer={timer}

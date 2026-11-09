@@ -94,25 +94,29 @@ export function DayColumn({
       }}
     >
       {/* Flat day heading: weekday, then the date; today's date sits in a filled circle. */}
+      {/* Pinned while the cards scroll: the day heading and the routine buttons. */}
+      <div className="sticky top-14 z-20 -mx-1 flex flex-col gap-2 bg-bg px-1 pt-3 pb-2 xl:top-0">
       {showHeader && (
       <header className="flex flex-col items-center pb-1">
         {/* Today sits in a soft box. */}
         <div className={`flex flex-col items-center rounded-2xl px-4 pt-2 pb-1 ${isToday ? "bg-surface-2" : ""}`}>
-        <p className="text-[11px] font-medium tracking-[1px] text-ink uppercase">{formatDow(day)}</p>
-        <p className="font-title text-xl leading-7 font-medium text-ink tabular-nums">
+        <p className="text-xs font-medium tracking-[1px] text-ink-2 uppercase">{formatDow(day)}</p>
+        <p className="mt-0.5 font-title text-[22px] leading-7 font-medium text-ink tabular-nums">
           {String(dayOfMonth(day)).padStart(2, "0")}
         </p>
         </div>
-        <p className="mt-0.5 text-[11px] font-medium text-ink-3 tabular-nums" title={`${done} of ${items.length} tasks done`}>
+        <p className="mt-1 text-xs text-ink-3 tabular-nums" title={`${done} of ${items.length} tasks done`}>
           {items.length ? `${done}/${items.length} done` : "\u00a0"}
         </p>
       </header>
       )}
 
       {routine.length > 0 && (
-        <div className="flex flex-wrap gap-1.5" aria-label="Routine">
+        <div className="flex flex-wrap gap-2" aria-label="Routine">
           {routine.map(({ item, time }) => {
-            const Icon = item.when === "morning" ? SunHorizon : Moon
+            // Colour follows the icon: amber sun for morning, violet moon for evening, grey clock for your own.
+            const Icon = !item.daily ? Clock : item.when === "morning" ? SunHorizon : Moon
+            const color = !item.daily ? "slate" : item.when === "morning" ? "amber" : "violet"
             return (
               <button
                 key={item.id}
@@ -121,30 +125,33 @@ export function DayColumn({
                 disabled={future && item.daily}
                 title={time ? `${item.name} at ${time}` : `Log ${item.name}`}
                 aria-label={time ? `${item.name} at ${time}` : `Log ${item.name}`}
-                className={`press flex h-8 min-w-0 flex-1 items-center justify-center gap-1 rounded-lg px-1.5 text-xs font-semibold disabled:opacity-40 ${
-                  time ? "bg-accent-soft text-accent" : "border border-dashed border-line text-ink-3"
+                style={{ ["--hc" as string]: colorVar(color) }}
+                className={`press flex h-11 min-w-0 flex-1 items-center justify-center gap-1.5 rounded-xl px-2 text-sm font-medium disabled:opacity-40 ${
+                  time ? "hc-soft hc-text" : "border-[1.5px] border-dashed border-[color-mix(in_oklab,var(--hc)_40%,transparent)] text-ink-2"
                 }`}
               >
-                <Icon size={14} className={item.when === "morning" ? "shrink-0 text-[var(--h-amber)]" : "shrink-0 text-[var(--h-violet)]"} />
+                <Icon size={18} weight={time ? "fill" : "regular"} className="hc-text shrink-0" />
                 {/* Narrow columns show just the icon and time; the name is in the tooltip. */}
-                <span className="truncate @max-[13rem]:hidden">{item.name}</span>
+                {/* Once a time is logged, the icon says which one: narrow columns keep just icon + time. */}
+                <span className={`truncate @max-[13rem]:hidden ${time ? "@max-[22rem]:hidden" : ""}`}>{item.name}</span>
                 {time && <span className="shrink-0 tabular-nums">{time}</span>}
               </button>
             )
           })}
         </div>
       )}
+      </div>
 
       <button
         onClick={onAdd}
-        className="press flex h-10 items-center justify-center gap-1.5 rounded-xl bg-surface-2 text-sm font-semibold text-ink-2"
+        className="press flex h-10 items-center justify-center gap-1.5 rounded-xl bg-surface-2 text-sm font-medium text-ink-2"
       >
         <Plus size={16} weight="bold" /> Add
       </button>
 
       {blocks.length === 0 && <p className="px-1 py-3 text-center text-xs text-ink-3">Nothing planned.</p>}
 
-      <ul className="flex flex-col gap-3">
+      <ul className="flex flex-col gap-4">
         {blocks.map((b, idx) => (
           <Fragment key={b.key}>
             {idx === marker && <NowMarker time={now!} />}
@@ -182,7 +189,7 @@ const PARTS: Record<DayPart, [string, typeof Sun]> = {
 function PartDivider({ part }: { part: DayPart }) {
   const [label, Icon] = PARTS[part]
   return (
-    <li aria-label={label} className="flex items-center gap-2 pt-1 text-[11px] font-semibold tracking-[0.12em] text-ink-2 uppercase">
+    <li aria-label={label} className="flex items-center gap-2 pt-2 text-xs font-medium tracking-[0.12em] text-ink-3 uppercase">
       <Icon size={14} aria-hidden />
       {label}
       <span className="h-px flex-1 bg-line" aria-hidden />
@@ -200,7 +207,7 @@ function NowMarker({ time }: { time: string }) {
   )
 }
 
-const chip = "rounded-md px-1 py-px text-[11px] font-semibold tabular-nums whitespace-nowrap"
+const chip = "rounded-md px-1.5 py-0.5 text-xs font-medium tabular-nums whitespace-nowrap"
 
 /**
  * The card's time. It's only the expected time: click to change it for this day.
@@ -287,13 +294,13 @@ function ItemRow({
 }) {
   const Icon = item.group.icon
   return (
-    <li className={`flex items-center gap-3 px-3 py-2.5 ${focused ? "ring-2 ring-accent ring-inset" : ""}`}>
+    <li className={`flex items-center gap-3 px-3.5 py-3.5 ${focused ? "ring-2 ring-accent ring-inset" : ""}`}>
       <span className="hc-soft grid size-7 shrink-0 place-items-center rounded-full" aria-hidden>
         <Icon size={14} className="hc-text" />
       </span>
       <button onClick={onFocus} aria-current={focused ? "true" : undefined} title="Focus on this" className="min-w-0 flex-1 text-left">
-        <span className={`block text-xs leading-4 font-semibold break-words ${item.done ? "text-ink-3 line-through" : ""}`}>{item.name}</span>
-        {item.minutes ? <span className="mt-0.5 block text-[11px] leading-4 text-ink-2 tabular-nums">{fmtMinutes(item.minutes)}</span> : null}
+        <span className={`block text-[13.5px] leading-5 font-medium break-words ${item.done ? "text-ink-3 line-through" : ""}`}>{item.name}</span>
+        {item.minutes ? <span className="mt-0.5 block text-xs leading-4 text-ink-3 tabular-nums">{fmtMinutes(item.minutes)}</span> : null}
       </button>
       {item.kind === "task" && (
         <button onClick={onEdit} aria-label={`Edit ${item.name}`} title="Edit task" className="press grid size-7 shrink-0 place-items-center rounded-full text-ink-3">
@@ -308,7 +315,7 @@ function ItemRow({
 /** Card frame: a band in the group's soft color (icon, NAME (count), time, actions), then the rows. */
 const cardFrame = (focused: boolean) =>
   `overflow-hidden rounded-2xl border bg-surface ${focused ? "border-accent" : "border-card-line"}`
-const bandLabel = "min-w-0 truncate text-[11px] font-medium tracking-[0.6px] text-ink uppercase"
+const bandLabel = "min-w-0 truncate text-xs font-medium tracking-[0.6px] text-ink uppercase"
 
 /** A group's card: band with the group's name and done/total, then its items as rows. */
 function GroupBlock({
@@ -338,7 +345,7 @@ function GroupBlock({
 
   return (
     <li style={{ ["--hc" as string]: colorVar(group.color) }} className={cardFrame(groupFocused)}>
-      <div className="hc-soft flex items-center gap-1.5 py-1.5 pr-1 pl-3">
+      <div className="hc-soft flex items-center gap-1.5 py-2.5 pr-1.5 pl-3.5">
         <button
           onClick={onFocusGroup}
           aria-current={groupFocused ? "true" : undefined}
@@ -347,7 +354,7 @@ function GroupBlock({
         >
           <Icon size={15} className="hc-text shrink-0" aria-hidden />
           <span className={bandLabel}>{group.label}</span>
-          <span className="-ml-0.5 shrink-0 text-[11px] font-medium text-ink tabular-nums">
+          <span className="-ml-0.5 shrink-0 text-xs text-ink-2 tabular-nums">
             ({done}/{items.length})
           </span>
         </button>
@@ -400,7 +407,7 @@ function SingleBlock({
 
   return (
     <li style={{ ["--hc" as string]: colorVar(item.group.color) }} className={cardFrame(focused)}>
-      <div className="hc-soft flex items-center gap-2 py-1.5 pr-2.5 pl-3">
+      <div className="hc-soft flex items-center gap-2 py-2.5 pr-2.5 pl-3.5">
         <Icon size={15} className="hc-text shrink-0" aria-hidden />
         <span className={`${bandLabel} flex-1`}>{item.group.label}</span>
         <TimeChip time={block.time} expected={block.expected} onChange={onSetTime} />

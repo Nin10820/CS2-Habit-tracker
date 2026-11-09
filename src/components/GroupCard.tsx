@@ -49,13 +49,13 @@ export function GroupCard({
 
       {open && (
         <>
-          {subtitle && <p className="mt-1.5 truncate px-1 text-xs text-ink-3">{subtitle}</p>}
+          {subtitle && <p className="mt-2 truncate px-1 text-xs text-ink-3">{subtitle}</p>}
           {items.length === 0 ? (
             <div className="mt-2">
               <DashedEmpty text="Not planned today" onAdd={onPlanToday} addLabel={`Add ${group.label} to today`} />
             </div>
           ) : (
-            <ul className="mt-2 space-y-2">
+            <ul className="mt-2.5 space-y-2.5">
               {items.map((i) => {
                 const focused = focusedId === `${i.kind}:${i.id}`
                 return (
@@ -67,11 +67,11 @@ export function GroupCard({
                       onClick={() => onFocus(i)}
                       aria-current={focused ? "true" : undefined}
                       title="Focus on this"
-                      className={`min-w-0 flex-1 truncate text-left text-xs font-semibold ${i.done ? "text-ink-3 line-through" : ""}`}
+                      className={`min-w-0 flex-1 truncate text-left text-[13.5px] font-medium ${i.done ? "text-ink-3 line-through" : ""}`}
                     >
                       {i.name}
                     </button>
-                    {i.minutes ? <span className="shrink-0 text-[11px] text-ink-3 tabular-nums">{i.minutes}′</span> : null}
+                    {i.minutes ? <span className="shrink-0 text-xs text-ink-3 tabular-nums">{i.minutes}′</span> : null}
                     <button
                       onClick={() => onToggle(i)}
                       aria-pressed={i.done}

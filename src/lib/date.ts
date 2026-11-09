@@ -65,9 +65,9 @@ export function formatWeekRange(start: DayKey): string {
   return `${month(s)} ${s.getDate()} – ${e.getDate()}, ${e.getFullYear()}`
 }
 
-/** "November 2026", or "October – November 2026" for a week across two months. */
-export function formatWeekMonths(start: DayKey): string {
-  const [s, e] = [fromKey(start), fromKey(addDays(start, 6))]
+/** "November 2026", or "October – November 2026" for days across two months. */
+export function formatWeekMonths(start: DayKey, length = 7): string {
+  const [s, e] = [fromKey(start), fromKey(addDays(start, length - 1))]
   const month = (d: Date) => d.toLocaleDateString("en-US", { month: "long" })
   if (s.getFullYear() !== e.getFullYear()) return `${month(s)} ${s.getFullYear()} – ${month(e)} ${e.getFullYear()}`
   if (s.getMonth() !== e.getMonth()) return `${month(s)} – ${month(e)} ${e.getFullYear()}`
@@ -91,3 +91,22 @@ export function isoWeek(key: DayKey): number {
 
 /** Monday..Sunday of the week containing `key`. */
 export const weekOf = (key: DayKey) => range(startOfWeek(key), addDays(startOfWeek(key), 6))
+
+/** The same day of the month `n` months later (clamped to the month's last day). */
+export function addMonths(key: DayKey, n: number): DayKey {
+  const d = fromKey(key)
+  const target = new Date(d.getFullYear(), d.getMonth() + n, 1)
+  const last = new Date(target.getFullYear(), target.getMonth() + 1, 0).getDate()
+  target.setDate(Math.min(d.getDate(), last))
+  return toKey(target)
+}
+
+/** Mondays-first grid of whole weeks covering the month of `key` (5 or 6 rows of 7 days). */
+export function monthGrid(key: DayKey): DayKey[][] {
+  const first = startOfMonth(key)
+  const d = fromKey(first)
+  const lastDay = toKey(new Date(d.getFullYear(), d.getMonth() + 1, 0))
+  const weeks: DayKey[][] = []
+  for (let w = startOfWeek(first); w <= lastDay; w = addDays(w, 7)) weeks.push(range(w, addDays(w, 6)))
+  return weeks
+}

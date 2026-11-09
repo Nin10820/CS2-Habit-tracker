@@ -13,14 +13,17 @@
   --surface-2: #f6f5f4;
   --border: #ebe9e6;
   --card-line: #e9e6e3;
-  --text: #111717;
-  --text-2: #363636;
-  --text-3: #85888c;
+  /* Text a touch softer than pure black: less contrast, easier on the eye. */
+  --text: #2a2f31;
+  --text-2: #5a5f63;
+  --text-3: #93969a;
   --accent: #2f7d5b;
   --accent-soft: #e2f0e8;
   --on-accent: #ffffff;
   --flame: #d9601f;
   --danger: #c4321f;
+  /* Calendar "today" and the now line (Week / Month views). */
+  --now: #ff3b30;
   --overlay: rgb(15 17 19 / 40%);
   --shadow: 0 2px 8px 1px rgb(10 10 10 / 3%);
 
@@ -44,14 +47,15 @@
     --surface-2: #22262b;
     --border: #2c3137;
     --card-line: #262a30;
-    --text: #f1f2f4;
-    --text-2: #b1b7c0;
+    --text: #e2e4e8;
+    --text-2: #a9afb8;
     --text-3: #7f8691;
     --accent: #5cc597;
     --accent-soft: #1b3128;
     --on-accent: #0b1a13;
     --flame: #f2894c;
     --danger: #f97066;
+    --now: #ff453a;
     --overlay: rgb(0 0 0 / 60%);
     --shadow: 0 1px 2px rgb(0 0 0 / 30%);
 
@@ -74,14 +78,15 @@
   --surface-2: #22262b;
   --border: #2c3137;
   --card-line: #262a30;
-  --text: #f1f2f4;
-  --text-2: #b1b7c0;
+  --text: #e2e4e8;
+  --text-2: #a9afb8;
   --text-3: #7f8691;
   --accent: #5cc597;
   --accent-soft: #1b3128;
   --on-accent: #0b1a13;
   --flame: #f2894c;
   --danger: #f97066;
+  --now: #ff453a;
   --overlay: rgb(0 0 0 / 60%);
   --shadow: 0 1px 2px rgb(0 0 0 / 30%);
 

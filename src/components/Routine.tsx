@@ -69,8 +69,8 @@ export function RoutineCard({
 
       {open && (
         <>
-          <p className="mt-1.5 px-1 text-xs text-ink-3">Drag onto a day, or tap + to add today.</p>
-          <ul className="mt-2 space-y-2">
+          <p className="mt-2 px-1 text-xs text-ink-3">Drag onto a day, or tap + to add today.</p>
+          <ul className="mt-2.5 space-y-2.5">
             {own.map((i) => {
               const on = onToday.has(i.id)
               return (
@@ -88,7 +88,7 @@ export function RoutineCard({
                   <span className="grid size-7 shrink-0 place-items-center rounded-full bg-surface-2 text-ink-2" aria-hidden>
                     <Clock size={14} />
                   </span>
-                  <span className="min-w-0 flex-1 truncate text-xs font-semibold">{i.name}</span>
+                  <span className="min-w-0 flex-1 truncate text-[13.5px] font-medium">{i.name}</span>
                   <DotsSixVertical size={16} className="shrink-0 text-ink-3" aria-hidden />
                   <button
                     onClick={() => onToggleToday(i, !on)}
@@ -122,7 +122,7 @@ export function RoutineCard({
                   maxLength={40}
                   placeholder="Name, then Enter"
                   aria-label="New routine moment"
-                  className="h-9 min-w-0 flex-1 bg-transparent text-sm font-semibold text-ink outline-none placeholder:font-normal placeholder:text-ink-3"
+                  className="h-9 min-w-0 flex-1 bg-transparent text-[13.5px] font-medium text-ink outline-none placeholder:font-normal placeholder:text-ink-3"
                 />
               </li>
             )}

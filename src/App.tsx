@@ -4,7 +4,7 @@ import { GroupCard } from "./components/GroupCard"
 import { ProgressPanel } from "./components/ProgressPanel"
 import { SettingsSheet } from "./components/SettingsSheet"
 import { TaskSheet } from "./components/TaskSheet"
-import { QuickTimer } from "./components/Timer"
+import { MiniPlayer, QuickTimer, useFocusTimer } from "./components/Timer"
 import { WeekBoard } from "./components/WeekBoard"
 import { GROUPS } from "./config/groups"
 import { todayKey, type DayKey } from "./lib/date"
@@ -35,6 +35,19 @@ function useToday() {
     }
   }, [])
   return today
+}
+
+/** True from 1280px, where the side panels replace the tabs. */
+function useWide() {
+  const query = "(min-width: 1280px)"
+  const [wide, setWide] = useState(() => window.matchMedia(query).matches)
+  useEffect(() => {
+    const mq = window.matchMedia(query)
+    const on = () => setWide(mq.matches)
+    mq.addEventListener("change", on)
+    return () => mq.removeEventListener("change", on)
+  }, [])
+  return wide
 }
 
 /** Open/closed state of a side panel, remembered in this browser. */
@@ -88,11 +101,18 @@ export default function App() {
   const [focus, setFocus] = useState<FocusRef | null>(null)
   const focused = focus ? itemsForDay(data, focus.day).find((i) => i.kind === focus.kind && i.id === focus.id) : undefined
   const focusKey = focused && focus ? `${focus.day}:${focus.kind}:${focus.id}` : undefined
-  const pickFocus = (item: DayItem, day: DayKey) => {
-    setFocus({ kind: item.kind, id: item.id, day })
-    // Make sure the timer is on screen: open the left panel, or switch to the Focus tab on smaller screens.
-    if (window.matchMedia("(min-width: 1280px)").matches) setLeftOpen(true)
-    else setTab("focus")
+  // Picking only sets the task: the view stays put, and the mini player shows it if the Quick timer is off screen.
+  const pickFocus = (item: DayItem, day: DayKey) => setFocus({ kind: item.kind, id: item.id, day })
+  const focusTask = focused && focus ? { item: focused, day: focus.day, today } : undefined
+  const timer = useFocusTimer(focusTask)
+
+  const wide = useWide()
+  const timerOnScreen = wide ? leftOpen : tab === "focus"
+  const showMini = !!focusTask && !timerOnScreen
+  const openTimer = () => (wide ? setLeftOpen(true) : setTab("focus"))
+  const closeMini = () => {
+    if (timer.running) timer.toggle(timer.running)
+    setFocus(null)
   }
 
   const themeBtn = (
@@ -132,7 +152,7 @@ export default function App() {
   const pad = "px-4 pt-4 pb-[calc(96px+env(safe-area-inset-bottom))] sm:px-6 sm:pb-12"
 
   return (
-    <div className="min-h-dvh xl:flex xl:h-dvh xl:overflow-hidden">
+    <div className={`min-h-dvh xl:flex xl:h-dvh xl:overflow-hidden ${showMini ? "pb-20" : ""}`}>
       {/* Small screens: theme, settings and (from 640px) the tabs. No logo. */}
       <header className="sticky top-0 z-30 flex h-14 items-center gap-2 border-b border-line bg-bg/85 px-4 backdrop-blur-md sm:px-6 xl:hidden">
         <nav aria-label="Main" className="hidden gap-1 rounded-2xl bg-surface-2 p-1 sm:flex">
@@ -164,7 +184,8 @@ export default function App() {
         </div>
         <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-1">
           <QuickTimer
-            task={focused && focus ? { item: focused, day: focus.day, today } : undefined}
+            task={focusTask}
+            timer={timer}
             onToggleTask={() => focused && focus && toggle(focused, focus.day)}
             onClearTask={() => setFocus(null)}
           />
@@ -245,6 +266,16 @@ export default function App() {
           ))}
         </div>
       </nav>
+
+      {showMini && focusTask && (
+        <MiniPlayer
+          task={focusTask}
+          timer={timer}
+          onToggleTask={() => toggle(focusTask.item, focusTask.day)}
+          onClose={closeMini}
+          onExpand={openTimer}
+        />
+      )}
 
       {sheet?.kind === "add" && <TaskSheet day={sheet.day} onSave={store.addTask} onClose={() => setSheet(null)} />}
       {sheet?.kind === "edit" && (

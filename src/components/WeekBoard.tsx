@@ -185,7 +185,7 @@ export function WeekBoard({
       {/* 768px+: seven columns side by side */}
       <div
         ref={scroller}
-        className="mt-5 hidden snap-x scroll-px-4 xl:scroll-px-20 items-start gap-3 overflow-x-auto pb-3 md:flex xl:mt-0 xl:min-h-0 xl:flex-1 xl:overflow-auto xl:px-20 xl:py-4"
+        className="mt-5 hidden snap-x scroll-px-4 xl:scroll-px-20 items-start gap-5 overflow-x-auto pb-3 md:flex xl:mt-0 xl:min-h-0 xl:flex-1 xl:overflow-auto xl:px-20 xl:py-4"
       >
         {view === "day" ? (
           <DayColumn

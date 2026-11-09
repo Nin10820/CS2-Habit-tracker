@@ -76,7 +76,7 @@ export function DayColumn({
 
       {blocks.length === 0 && <p className="px-1 py-3 text-center text-xs text-ink-3">Nothing planned.</p>}
 
-      <ul className="flex flex-col gap-2">
+      <ul className="flex flex-col gap-3">
         {blocks.map((b, idx) => (
           <Fragment key={b.key}>
             {idx === marker && <NowMarker time={now!} />}
@@ -251,7 +251,7 @@ function SingleBlock({
   return (
     <li
       style={{ ["--hc" as string]: colorVar(item.group.color) }}
-      className={`rounded-xl border bg-surface shadow-card ${focused ? "border-transparent ring-2 ring-accent" : "border-line"}`}
+      className={`rounded-xl border bg-surface shadow-card ${focused ? "border-accent ring-1 ring-accent ring-inset" : "border-line"}`}
     >
       <div className="flex items-center gap-2 px-3 pt-3">
         <TimeChip time={block.time} expected={block.expected} onChange={onSetTime} />

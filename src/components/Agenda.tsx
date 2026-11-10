@@ -38,7 +38,8 @@ export function Agenda({
     <div {...dragScroll()} className="cursor-grab overflow-x-auto px-4 pt-4 pb-[calc(var(--player-space)+16px)] xl:min-h-0 xl:flex-1 xl:overflow-auto">
       <div className="grid items-start gap-x-4 gap-y-5" style={{ gridTemplateColumns: `56px repeat(${columns.length}, minmax(260px, 1fr))` }}>
         {days.map((d) => {
-          const items = itemsForDay(data, d)
+          // A day that has passed shows only what got done.
+          const items = itemsForDay(data, d).filter((i) => d >= today || i.done)
           const isToday = d === today
           return (
             <Row key={d}>

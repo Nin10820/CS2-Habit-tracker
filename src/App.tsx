@@ -103,6 +103,9 @@ export default function App() {
   const store = useStore()
   const { data } = store
   const today = useToday()
+  // When a day is over (on opening, or at midnight), its undone one-off tasks are cleared away.
+  const { dropMissedTasks } = store
+  useEffect(() => dropMissedTasks(today), [today, dropMissedTasks])
   const [theme, setTheme, isDark] = useTheme()
   const [dayParts, setDayParts] = useDayParts()
   const [tab, setTab] = useState<Tab>("tasks")

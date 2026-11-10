@@ -201,7 +201,7 @@ export function WeekBoard({
           showHeader={false}
           day={day}
           today={today}
-          blocks={blocksForDay(data, day)}
+          blocks={blocksForDay(data, day, today)}
           onToggle={(i) => onToggle(i, day)}
           onAdd={() => onAdd(day)}
           onEdit={onEdit}
@@ -253,7 +253,7 @@ export function WeekBoard({
               className="min-w-0 flex-1 basis-0 snap-start xl:pb-[calc(var(--player-space)+16px)]"
               day={k}
               today={today}
-              blocks={blocksForDay(data, k)}
+              blocks={blocksForDay(data, k, today)}
               onToggle={(i) => onToggle(i, k)}
               onAdd={() => onAdd(k)}
               onEdit={onEdit}

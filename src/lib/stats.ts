@@ -40,16 +40,19 @@ export const OTHER_KEY = "group:other"
 /**
  * The day as cards: "Other" first (your stand-alone list and one-off tasks in no group, as one
  * card), then one card per group, in time order or the order you dragged them into.
+ * Given `today`, a day that has passed shows only what got done (stats still count everything).
  */
-export function blocksForDay(data: AppData, day: DayKey): DayBlock[] {
-  const items = itemsForDay(data, day)
+export function blocksForDay(data: AppData, day: DayKey, today?: DayKey): DayBlock[] {
+  const past = !!today && day < today
+  const items = itemsForDay(data, day).filter((i) => !past || i.done)
   const changed = data.times[day] ?? {}
   const blocks: DayBlock[] = []
   for (const g of groupDefs(data).values()) {
     if (g.standalone) continue
     const mine = items.filter((i) => i.group.id === g.id)
-    // A planned group with an empty list still gets its card, so you can see it and fill it in.
-    if (!mine.length && !plansOn(data, g.id, day).length) continue
+    // A planned group with an empty list still gets its card, so you can see it and fill it in
+    // (not on a past day: there an empty card only means nothing got done).
+    if (!mine.length && (past || !plansOn(data, g.id, day).length)) continue
     const key = groupKey(g.id)
     blocks.push({ kind: "group", key, group: g, items: mine, expected: g.time, time: changed[key] ?? g.time })
   }

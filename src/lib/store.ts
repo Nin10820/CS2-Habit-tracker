@@ -304,6 +304,14 @@ export function useStore() {
     setData((d) => ({ ...d, tasks: d.tasks.filter((t) => t.id !== id) }))
   }, [])
 
+  /** One-off tasks left undone on a day that has passed are deleted (done ones stay, for stats). */
+  const dropMissedTasks = useCallback((today: DayKey) => {
+    setData((d) => {
+      const keep = d.tasks.filter((t) => t.done || t.day >= today)
+      return keep.length === d.tasks.length ? d : { ...d, tasks: keep }
+    })
+  }, [])
+
   /** Change a card's time for one day; null goes back to the expected time. */
   const setTime = useCallback((day: DayKey, key: string, time: string | null) => {
     setData((d) => {
@@ -447,6 +455,7 @@ export function useStore() {
     setTime,
     setOrder,
     addFocus,
+    dropMissedTasks,
     replaceAll,
     saveGroup,
     deleteGroup,

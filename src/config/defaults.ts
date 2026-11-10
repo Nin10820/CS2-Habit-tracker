@@ -5,7 +5,6 @@
  * Ids match the old config, so earlier check-ins carry over.
  * Pinned tasks are on every planned day; the others are the numbered list the group picks from.
  */
-import dapXe from "../content/groups/dap-xe.md?raw"
 import actionCam from "../content/groups/script-action-cam.md?raw"
 import tiengAnh from "../content/groups/tieng-anh.md?raw"
 import vlogSang from "../content/groups/vlog-sang.md?raw"
@@ -19,29 +18,23 @@ export const DEFAULT_ROUTINE: RoutineItem[] = [
 
 export const DEFAULT_GROUPS: Group[] = [
   {
-    // Was "Routine" with Dậy sớm too; waking up is now a Routine moment you log the time of.
+    // Your default list: actions that stand alone, each its own card on the day (no group card).
+    // Id "routine" is kept from older data (it was "Routine", then "Planning"), so check-ins carry over.
     id: "routine",
-    label: "Planning",
-    title: "Cho hôm sau",
-    icon: "work",
-    color: "amber",
+    label: "Other",
+    title: "Việc lẻ · không thuộc nhóm nào",
+    icon: "list",
+    color: "slate",
     standalone: true,
     mode: "order",
     perDay: 1,
-    tasks: [{ id: "planning", name: "Planning cho hôm sau", time: "21:30", minutes: 10, pinned: true }],
-  },
-  {
-    id: "dap-xe",
-    label: "Đạp xe",
-    title: "20km. Đi.",
-    note: "5:45–6:45 · bật Action 5 từ đầu, một góc.",
-    icon: "bike",
-    color: "green",
-    time: "05:45",
-    doc: dapXe,
-    mode: "order",
-    perDay: 1,
-    tasks: [{ id: "dap-xe-20km", name: "Đạp xe 20km", minutes: 60, pinned: true }],
+    tasks: [
+      { id: "tap-gym", name: "Tập gym", time: "06:45", minutes: 45, pinned: true },
+      { id: "dap-xe-20km", name: "Đạp xe 20km", time: "05:45", minutes: 60, pinned: true },
+      { id: "an", name: "Ăn", pinned: true },
+      { id: "di-bo", name: "Đi bộ / đi dạo", pinned: true },
+      { id: "planning", name: "Planning cho hôm sau", time: "21:30", minutes: 10, pinned: true },
+    ],
   },
   {
     id: "vlog-sang",
@@ -54,10 +47,7 @@ export const DEFAULT_GROUPS: Group[] = [
     doc: vlogSang,
     mode: "order",
     perDay: 1,
-    tasks: [
-      { id: "tap-gym", name: "Tập gym", minutes: 45, pinned: true },
-      { id: "quay-vlog", name: "Quay đủ 8 beat", minutes: 3, pinned: true },
-    ],
+    tasks: [{ id: "quay-vlog", name: "Quay đủ 8 beat", minutes: 3, pinned: true }],
   },
   {
     id: "tieng-anh",

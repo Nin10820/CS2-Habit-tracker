@@ -1,4 +1,5 @@
 import { X } from "@phosphor-icons/react"
+import { btn } from "./ui"
 import { useEffect, useRef, type ReactNode } from "react"
 
 /**
@@ -53,7 +54,7 @@ export function Sheet({
         aria-modal="true"
         aria-label={title}
         tabIndex={wide ? -1 : undefined}
-        className={`sheet-in relative w-full rounded-t-3xl bg-surface shadow-card outline-none sm:rounded-3xl ${page ? "overflow-hidden" : ""} ${
+        className={`sheet-in relative w-full rounded-t-2xl border border-line bg-surface shadow-[0_20px_24px_-4px_rgb(16_24_40/0.10),0_8px_8px_-4px_rgb(16_24_40/0.04)] outline-none sm:rounded-2xl ${page ? "overflow-hidden" : ""} ${
           wide
             ? "flex max-h-[92dvh] max-w-3xl flex-col sm:max-h-[88dvh]"
             : `${roomy ? "max-w-lg" : "max-w-md"} px-5 pt-5 pb-[max(20px,env(safe-area-inset-bottom))] sm:pb-5`
@@ -80,7 +81,7 @@ export function Sheet({
             data-close
             onClick={onClose}
             aria-label="Close"
-            className="press grid size-9 shrink-0 place-items-center rounded-full bg-surface-2 text-ink-2"
+            className="press grid size-9 shrink-0 place-items-center rounded-lg text-ink-3 hover:bg-surface-2 hover:text-ink"
           >
             <X size={18} weight="bold" />
           </button>
@@ -113,9 +114,9 @@ export function ConfirmSheet({
 }) {
   return (
     <Sheet title={title} onClose={onClose}>
-      <p className="text-ink-2">{body}</p>
+      <p className="text-sm leading-6 text-ink-2">{body}</p>
       <div className="mt-6 flex gap-3">
-        <button onClick={onClose} className="press h-12 flex-1 rounded-2xl bg-surface-2 font-semibold">
+        <button onClick={onClose} className={`${btn.secondary} flex-1`}>
           Cancel
         </button>
         <button
@@ -123,7 +124,7 @@ export function ConfirmSheet({
             onConfirm()
             onClose()
           }}
-          className="press h-12 flex-1 rounded-2xl bg-danger font-semibold text-white"
+          className={`${btn.danger} flex-1`}
         >
           {confirmLabel}
         </button>

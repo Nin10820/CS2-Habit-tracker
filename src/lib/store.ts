@@ -213,7 +213,51 @@ export function parseData(input: unknown): AppData {
     }
   }
 
-  return { version: 3, startedAt, groups, plans, checks, tasks, times, order, focus, routine: { items, days: routineDays, log } }
+  const moved = moveToActions(groups, plans, checks)
+
+  return { version: 3, startedAt, groups: moved.groups, plans: moved.plans, checks, tasks, times, order, focus, routine: { items, days: routineDays, log } }
+}
+
+/** Your default list: stand-alone actions and one-off tasks, each its own card. */
+const OTHER = { label: "Other", title: "Việc lẻ · không thuộc nhóm nào", note: undefined, icon: "list", color: "slate" } as const
+
+/**
+ * Nov 2026: the stand-alone "Planning" group becomes your default "Actions" list, where each task is
+ * its own card. Đạp xe 20km (its own group) and Tập gym (from Vlog sáng) move in with their ticks,
+ * and Ăn and Đi bộ / đi dạo are added. Runs once: only while that group is still called "Planning".
+ */
+function moveToActions(groups: Group[], plans: Plan[], checks: AppData["checks"]) {
+  const actions = groups.find((g) => g.id === "routine")
+  // Later the same month "Actions" was renamed "Other" (grey): it also holds one-off tasks.
+  if (actions?.standalone && actions.label === "Actions") Object.assign(actions, OTHER)
+  if (!actions?.standalone || actions.label !== "Planning") return { groups, plans }
+  const take = (from: string, taskId: string) => {
+    const g = groups.find((x) => x.id === from)
+    const t = g?.tasks.find((x) => x.id === taskId)
+    if (!g || !t) return undefined
+    g.tasks = g.tasks.filter((x) => x !== t)
+    const old = checks[`${from}/${taskId}`]
+    if (old) {
+      checks[`routine/${taskId}`] = { ...checks[`routine/${taskId}`], ...old }
+      delete checks[`${from}/${taskId}`]
+    }
+    // In a stand-alone list each task keeps its own time; it used to follow its group's.
+    return { ...t, time: t.time ?? g.time, pinned: true }
+  }
+  const gym = take("vlog-sang", "tap-gym")
+  const bike = take("dap-xe", "dap-xe-20km")
+  const has = (id: string) => actions.tasks.some((t) => t.id === id)
+  actions.tasks = [
+    ...(gym && !has(gym.id) ? [gym] : []),
+    ...(bike && !has(bike.id) ? [bike] : []),
+    ...(has("an") ? [] : [{ id: "an", name: "Ăn", pinned: true }]),
+    ...(has("di-bo") ? [] : [{ id: "di-bo", name: "Đi bộ / đi dạo", pinned: true }]),
+    ...actions.tasks,
+  ]
+  Object.assign(actions, OTHER)
+  // Đạp xe was a group of one: with its task moved out, the group and its plans go.
+  const gone = new Set(groups.filter((g) => g.id === "dap-xe" && g.tasks.length === 0).map((g) => g.id))
+  return { groups: groups.filter((g) => !gone.has(g.id)), plans: plans.filter((p) => !gone.has(p.group)) }
 }
 
 export const newId = () =>

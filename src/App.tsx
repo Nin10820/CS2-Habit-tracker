@@ -129,7 +129,11 @@ export default function App() {
     suggested: suggestTime(data, item, day, new Date()),
     logged: data.routine.log[item.id]?.[day],
   })
-  const logRoutine = (item: RoutineItem, day: DayKey) => setSheet({ kind: "routineLog", entries: [entryFor(item, day)], future: day > today })
+  // A moment already logged that day is un-logged by clicking it again; otherwise the form opens.
+  const logRoutine = (item: RoutineItem, day: DayKey) =>
+    data.routine.log[item.id]?.[day]
+      ? store.logRoutine(item.id, day, null)
+      : setSheet({ kind: "routineLog", entries: [entryFor(item, day)], future: day > today })
 
   // In the morning (and at night) the form opens by itself for moments not logged yet, once per day unless logged.
   const latest = useRef({ data, sheet })
@@ -216,6 +220,9 @@ export default function App() {
     setFocus(null)
     setQuick(false)
   }
+  // Clicking what's already in the player again closes the player.
+  const focusOrClose = (item: DayItem, day: DayKey) => (focusKey === `${day}:${item.kind}:${item.id}` ? closeMini() : pickFocus(item, day))
+  const groupOrClose = (groupId: string, day: DayKey) => (focusKey === `${day}:group:${groupId}` ? closeMini() : pickGroup(groupId, day))
 
   const themeBtn = (
     // Quick light / dark switch. "Follow the system" stays in Settings.
@@ -325,9 +332,10 @@ export default function App() {
               group={defs.get(g.id)!}
               onOpen={() => setSheet({ kind: "doc", groupId: g.id })}
               onPlanToday={() => store.addPlan(g.id, today)}
-              items={todayItems.filter((i) => i.group.id === g.id)}
+              // "Other" (the stand-alone list) also holds today's one-off tasks that aren't in a group.
+              items={todayItems.filter((i) => i.group.id === g.id || (g.standalone && i.group.id === ""))}
               onToggle={(i) => toggle(i, today)}
-              onFocus={(i) => pickFocus(i, today)}
+              onFocus={(i) => focusOrClose(i, today)}
               focusedId={focus?.day === today && focused ? `${focused.kind}:${focused.id}` : undefined}
             />
           ))}
@@ -347,8 +355,8 @@ export default function App() {
           onToggle={toggle}
           onAdd={(day) => setSheet({ kind: "add", day })}
           onEdit={edit}
-          onFocus={pickFocus}
-          onFocusGroup={pickGroup}
+          onFocus={focusOrClose}
+          onFocusGroup={groupOrClose}
           onGroupMenu={(groupId, day) => setSheet({ kind: "dayGroup", groupId, day })}
           onRoutine={logRoutine}
           onDropRoutine={(id, day) => store.setRoutineOnDay(id, day, true)}

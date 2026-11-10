@@ -1,6 +1,8 @@
 import { Check, Clock, DotsThree, Moon, PencilSimple, Plus, Sun, SunHorizon } from "@phosphor-icons/react"
 import { Fragment, useLayoutEffect, useRef, useState, type DragEvent, type KeyboardEvent, type ReactElement, type RefObject } from "react"
 import { getCardDrag, setCardDrag, setDropSlot, useCardDrag } from "../lib/cardDrag"
+import { celebrate } from "../lib/celebrate"
+import { OTHER_KEY } from "../lib/stats"
 import { dayOfMonth, formatDow, type DayKey } from "../lib/date"
 import { colorVar, type DayBlock, type DayItem, type RoutineItem } from "../lib/types"
 import { dayPart, type DayPart } from "../lib/prefs"
@@ -237,16 +239,17 @@ export function DayColumn({
       )}
       {!head && <div className="h-1" aria-hidden />}
 
-      <button
-        onClick={onAdd}
-        className="press flex h-10 items-center justify-center gap-1.5 rounded-xl bg-surface-2 text-sm font-medium text-ink-2"
-      >
-        <Plus size={16} weight="bold" /> Add
-      </button>
+      {/* Adding is the small + under a card on hover; an empty day keeps a quiet Add of its own. */}
+      {blocks.length === 0 && (
+        <p className="flex items-center justify-center gap-2 px-1 py-3 text-xs text-ink-3">
+          Nothing planned.
+          <button onClick={onAdd} className="press inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 font-semibold text-ink-2 hover:bg-surface-2">
+            <Plus size={12} weight="bold" /> Add
+          </button>
+        </p>
+      )}
 
-      {blocks.length === 0 && <p className="px-1 py-3 text-center text-xs text-ink-3">Nothing planned.</p>}
-
-      <ul ref={list} className="relative flex flex-col gap-4">
+      <ul ref={list} className="relative flex flex-col gap-5">
         {blocks.map((b, idx) => (
           <Fragment key={b.key}>
             {dayParts && (idx === 0 || dayPart(blocks[idx - 1].time) !== dayPart(b.time)) && <PartDivider part={dayPart(b.time)} />}
@@ -260,7 +263,8 @@ export function DayColumn({
                 groupFocused={focusKey === `${day}:group:${b.group.id}`}
                 onFocusGroup={() => onFocusGroup(b.group.id)}
                 onMenu={() => onGroupMenu(b.group.id)}
-                drag={onDropCard ? cardDrag({ from: day, kind: "group", id: b.group.id }, b.key) : undefined}
+                // "Other" always heads the day, so it isn't dragged.
+                drag={onDropCard && b.key !== OTHER_KEY ? cardDrag({ from: day, kind: "group", id: b.group.id }, b.key) : undefined}
                 {...handlers}
               />
             ) : (
@@ -280,6 +284,7 @@ export function DayColumn({
                 {...handlers}
               />
             )}
+            {!drag?.lifted && <AddGap onAdd={onAdd} />}
           </Fragment>
         ))}
         {slotAt >= visibleCount && <DropSlot height={drag!.height} />}
@@ -340,17 +345,17 @@ export function DayHead({
                 onClick={() => onRoutine?.(item)}
                 // On a future day only the moments you added can be opened (to take them off again).
                 disabled={future && item.daily}
-                title={time ? `${item.name} at ${time}` : `Log ${item.name}`}
-                aria-label={time ? `${item.name} at ${time}` : `Log ${item.name}`}
+                title={time ? `${item.name} at ${time} · click to undo` : `Log ${item.name}`}
+                aria-label={time ? `${item.name} at ${time}, click to undo` : `Log ${item.name}`}
+                aria-pressed={!!time}
                 style={{ ["--hc" as string]: colorVar(color) }}
                 className={`press flex h-11 min-w-0 flex-1 items-center justify-center gap-1.5 rounded-xl px-2 text-sm font-medium disabled:opacity-40 ${
                   time ? "hc-soft hc-text" : "border-[1.5px] border-dashed border-[color-mix(in_oklab,var(--hc)_40%,transparent)] bg-surface text-ink-2"
                 }`}
               >
                 <Icon size={18} weight={time ? "fill" : "regular"} className="hc-text shrink-0" />
-                {/* Narrow columns show just the icon and time; the name is in the tooltip. */}
-                {/* Once a time is logged, the icon says which one: narrow columns keep just icon + time. */}
-                <span className={`truncate @max-[13rem]:hidden ${time ? "@max-[22rem]:hidden" : ""}`}>{item.name}</span>
+                {/* Not logged: the name (just the icon in narrow columns). Logged: the icon says which, so only the time. */}
+                {!time && <span className="truncate @max-[13rem]:hidden">{item.name}</span>}
                 {time && <span className="shrink-0 tabular-nums">{time}</span>}
               </button>
             )
@@ -380,18 +385,23 @@ function PartDivider({ part }: { part: DayPart }) {
   )
 }
 
-function CheckCircle({ item, future, onToggle, size = "size-[22px]" }: { item: DayItem; future: boolean; onToggle: () => void; size?: string }) {
+export function CheckCircle({ item, future, onToggle, size = "size-[22px]" }: { item: DayItem; future: boolean; onToggle: () => void; size?: string }) {
   return (
     <button
-      onClick={onToggle}
+      onClick={(e) => {
+        // Ticking (not un-ticking) gets a little confetti and a chime.
+        if (!item.done) celebrate(e.currentTarget, colorVar(item.group.color))
+        onToggle()
+      }}
       disabled={future}
       aria-pressed={item.done}
       aria-label={future ? `${item.name}: can't tick a future day` : item.done ? `Mark ${item.name} not done` : `Mark ${item.name} done`}
-      className="-m-1.5 grid shrink-0 place-items-center p-1.5 disabled:opacity-35"
+      className="-m-1.5 grid shrink-0 place-items-center p-1.5 disabled:cursor-not-allowed"
     >
+      {/* Tickable: a thin mid-grey ring. A future day: a faint dashed ring, so it doesn't read as a button. */}
       <span
-        className={`grid ${size} place-items-center rounded-full border-[1.5px] transition-colors ${
-          item.done ? "hc-fill border-transparent text-white" : "border-ink text-ink-3"
+        className={`grid ${size} place-items-center rounded-full border transition-colors ${
+          item.done ? "hc-fill border-transparent text-white" : future ? "border-dashed border-[color-mix(in_oklab,var(--text-3)_50%,transparent)] text-ink-3" : "border-ink-2 text-ink-3 hover:border-ink"
         }`}
       >
         <Check size={11} weight="bold" className={item.done ? "pop" : "opacity-0"} />
@@ -401,7 +411,7 @@ function CheckCircle({ item, future, onToggle, size = "size-[22px]" }: { item: D
 }
 
 /** "30m", "1h", "1h 30m". */
-const fmtMinutes = (m: number) => (m < 60 ? `${m}m` : `${Math.floor(m / 60)}h${m % 60 ? ` ${m % 60}m` : ""}`)
+export const fmtMinutes = (m: number) => (m < 60 ? `${m}m` : `${Math.floor(m / 60)}h${m % 60 ? ` ${m % 60}m` : ""}`)
 
 /** A task row in a day card: round icon, name with its length under it, then the tick. */
 function ItemRow({
@@ -421,7 +431,7 @@ function ItemRow({
 }) {
   const Icon = item.group.icon
   return (
-    <li className={`flex items-center gap-3 px-3.5 py-3.5 ${focused ? "bg-[color-mix(in_oklab,var(--accent)_8%,var(--surface))] shadow-[inset_3px_0_0_var(--accent)]" : ""}`}>
+    <li className={`flex items-center gap-3 px-3.5 py-3 ${focused ? "shadow-[inset_3px_0_0_var(--accent)]" : ""}`}>
       <span className="hc-soft grid size-7 shrink-0 place-items-center rounded-full" aria-hidden>
         <Icon size={14} className="hc-text" />
       </span>
@@ -431,7 +441,7 @@ function ItemRow({
         title="Focus on this"
         className="min-w-0 flex-1 cursor-pointer text-left outline-none focus-visible:ring-2 focus-visible:ring-accent"
       >
-        <span className={`block text-[13.5px] leading-5 font-medium break-words ${item.done ? "text-ink-3 line-through" : ""}`}>{item.name}</span>
+        <span className={`block text-[13.5px] leading-5 font-[550] break-words ${item.done ? "text-ink-3 line-through" : ""}`}>{item.name}</span>
         {item.minutes ? <span className="mt-0.5 block text-xs leading-4 text-ink-3 tabular-nums">{fmtMinutes(item.minutes)}</span> : null}
       </div>
       {item.kind === "task" && (
@@ -446,10 +456,31 @@ function ItemRow({
 
 /** Card frame: a band in the group's soft color (icon, NAME (count), time, actions), then the rows. */
 const cardFrame = (focused: boolean) =>
-  `overflow-hidden rounded-2xl border bg-surface ${focused ? "border-accent" : "border-card-line"}`
+  // day-card: the small + right after it (AddGap) shows while the card is hovered.
+  `day-card overflow-hidden rounded-2xl border bg-surface ${focused ? "border-accent" : "border-card-line"}`
+
+/**
+ * A small round + sitting on the bottom edge of the card above it, shown while that card (or the
+ * + itself) is hovered or the + has keyboard focus. It takes no room: the list's gap stays the same.
+ */
+function AddGap({ onAdd }: { onAdd: () => void }) {
+  return (
+    // Shown only for the card right before it (+, not ~), and while the + itself is hovered or focused.
+    <li className="relative z-10 -my-2.5 h-0 opacity-0 transition-opacity [.day-card:hover+&]:opacity-100 has-[button:hover]:opacity-100 has-[button:focus-visible]:opacity-100">
+      <button
+        onClick={onAdd}
+        aria-label="Add a task to this day"
+        title="Add"
+        className="press absolute top-0 left-1/2 grid size-6 -translate-x-1/2 -translate-y-1/2 place-items-center rounded-full border border-line bg-surface text-ink-2 shadow-xs hover:text-ink"
+      >
+        <Plus size={12} weight="bold" />
+      </button>
+    </li>
+  )
+}
 const bandLabel = "hc-ink min-w-0 truncate text-[13px] font-semibold"
 /** "tiếng anh" → "Tiếng anh": first letter capital, the rest as typed. */
-const capFirst = (s: string) => s.charAt(0).toLocaleUpperCase("vi") + s.slice(1)
+export const capFirst = (s: string) => s.charAt(0).toLocaleUpperCase("vi") + s.slice(1)
 
 /** A group's card: band with the group's name and done/total, then its items as rows. */
 function GroupBlock({
@@ -541,14 +572,10 @@ function SingleBlock({
   focused: boolean
 }) {
   const { item } = block
-  const Icon = item.group.icon
 
+  // A stand-alone action is just its row: no group band on top.
   return (
     <li {...cardLi(block.key, look)} style={{ ["--hc" as string]: colorVar(item.group.color) }} className={`${cardFrame(focused)} ${dragClass(drag, look)}`} {...drag}>
-      <div className="hc-soft flex items-center gap-2 py-2.5 pr-2.5 pl-3.5">
-        <Icon size={15} className="hc-text shrink-0" aria-hidden />
-        <span className={`${bandLabel} flex-1`}>{capFirst(item.group.label)}</span>
-      </div>
       <ul>
         <ItemRow item={item} future={future} focused={false} onToggle={() => onToggle(item)} onEdit={() => onEdit(item)} onFocus={() => onFocus(item)} />
       </ul>

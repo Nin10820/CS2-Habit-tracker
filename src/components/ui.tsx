@@ -1,14 +1,226 @@
-import { CaretUp, Plus } from "@phosphor-icons/react"
-import { useRef, useState, type KeyboardEvent, type ReactNode } from "react"
+import { CaretDown, CaretUp, Check, Plus, X } from "@phosphor-icons/react"
+import { useEffect, useId, useLayoutEffect, useRef, useState, type KeyboardEvent, type ReactNode } from "react"
+import { createPortal } from "react-dom"
 
 const pad2 = (n: number) => String(n).padStart(2, "0")
 
+/*
+ * Form controls: one look for every field, dropdown and time picker (after the Untitled UI style).
+ * A light border, 8px corners, a hairline shadow, and on focus an accent border with a soft ring.
+ * Two sizes: md (44px, forms) and sm (36px, inside lists and toolbars).
+ */
+export type ControlSize = "sm" | "md"
+const SIZE: Record<ControlSize, string> = { md: "h-11 px-3.5 text-[15px]", sm: "h-9 px-3 text-sm" }
+/** The frame of a control. Add a size from `controlSize` (or your own height and padding). */
+export const control =
+  "rounded-lg border border-line bg-surface text-ink shadow-xs outline-none transition-[border-color,box-shadow] placeholder:text-ink-3 focus:border-accent focus:ring-4 focus:ring-accent/15 focus-within:border-accent focus-within:ring-4 focus-within:ring-accent/15"
+export const controlSize = (s: ControlSize = "md") => SIZE[s]
+/** A text field: `<input className={field()} />`. */
+export const field = (s: ControlSize = "md", extra = "") => `${control} ${SIZE[s]} w-full ${extra}`
+
+/** Buttons, same family: 44px tall, 8px corners. Add width / margin where you use them. */
+const buttonBase = "press inline-flex h-11 items-center justify-center gap-2 rounded-lg px-4 text-[15px] font-semibold transition-colors disabled:opacity-40"
+export const btn = {
+  primary: `${buttonBase} bg-accent text-on-accent shadow-xs`,
+  secondary: `${buttonBase} border border-line bg-surface text-ink shadow-xs hover:bg-surface-2`,
+  danger: `${buttonBase} bg-danger text-white shadow-xs`,
+  ghost: `${buttonBase} text-ink-2 hover:bg-surface-2`,
+  dangerGhost: `${buttonBase} text-danger hover:bg-[color-mix(in_oklab,var(--danger)_8%,transparent)]`,
+}
+
+/** A floating menu panel (dropdown lists). */
+const menuPanel =
+  "fixed z-[70] max-h-72 overflow-y-auto rounded-lg border border-line bg-surface p-1 shadow-[0_12px_16px_-4px_rgb(16_24_40/0.10),0_4px_6px_-2px_rgb(16_24_40/0.05)] outline-none"
+
+export type SelectOption<T extends string | number> = { value: T; label: string }
+
+/**
+ * A dropdown: a button showing the choice, and a menu of options with a ✓ on the chosen one.
+ * Keyboard: ↑/↓ (opens and moves), Enter or Space picks, Esc closes, typing a letter jumps.
+ * The menu floats above everything (it can leave a scrolling dialog) and flips up near the bottom.
+ */
+export function Select<T extends string | number>({
+  value,
+  options,
+  onChange,
+  size = "md",
+  id,
+  label,
+  className = "",
+}: {
+  value: T
+  options: SelectOption<T>[]
+  onChange: (v: T) => void
+  size?: ControlSize
+  id?: string
+  /** Accessible name when there's no <label for={id}>. */
+  label?: string
+  className?: string
+}) {
+  const [open, setOpen] = useState(false)
+  const [active, setActive] = useState(0)
+  const [pos, setPos] = useState<{ left: number; top?: number; bottom?: number; width: number } | null>(null)
+  const button = useRef<HTMLButtonElement>(null)
+  const menu = useRef<HTMLUListElement>(null)
+  const listId = useId()
+  const chosen = Math.max(0, options.findIndex((o) => o.value === value))
+
+  const show = (at = chosen) => {
+    setActive(at)
+    setOpen(true)
+  }
+  const pick = (i: number) => {
+    onChange(options[i].value)
+    setOpen(false)
+    button.current?.focus()
+  }
+
+  // Place the menu under the button (or above it when there's no room), and follow on scroll.
+  useLayoutEffect(() => {
+    if (!open) return
+    const place = () => {
+      const r = button.current!.getBoundingClientRect()
+      const below = innerHeight - r.bottom
+      const up = below < 240 && r.top > below
+      setPos({ left: r.left, width: r.width, ...(up ? { bottom: innerHeight - r.top + 6 } : { top: r.bottom + 6 }) })
+    }
+    place()
+    window.addEventListener("resize", place)
+    window.addEventListener("scroll", place, true)
+    return () => {
+      window.removeEventListener("resize", place)
+      window.removeEventListener("scroll", place, true)
+    }
+  }, [open])
+
+  // Click anywhere else closes it.
+  useEffect(() => {
+    if (!open) return
+    const away = (e: PointerEvent) => {
+      const t = e.target as Node
+      if (!button.current?.contains(t) && !menu.current?.contains(t)) setOpen(false)
+    }
+    document.addEventListener("pointerdown", away, true)
+    return () => document.removeEventListener("pointerdown", away, true)
+  }, [open])
+
+  // Keep the active option in view.
+  useEffect(() => {
+    if (open) menu.current?.children[active]?.scrollIntoView({ block: "nearest" })
+  }, [open, active])
+
+  const onKey = (e: KeyboardEvent) => {
+    const k = e.key
+    if (k === "ArrowDown" || k === "ArrowUp") {
+      e.preventDefault()
+      if (!open) return show()
+      setActive((a) => (k === "ArrowDown" ? Math.min(options.length - 1, a + 1) : Math.max(0, a - 1)))
+    } else if (k === "Home" || k === "End") {
+      if (!open) return
+      e.preventDefault()
+      setActive(k === "Home" ? 0 : options.length - 1)
+    } else if (k === "Enter" || k === " ") {
+      e.preventDefault()
+      if (open) pick(active)
+      else show()
+    } else if (k === "Escape") {
+      if (open) {
+        // Don't let a surrounding dialog close too.
+        e.stopPropagation()
+        setOpen(false)
+      }
+    } else if (k === "Tab") {
+      setOpen(false)
+    } else if (k.length === 1 && /\S/.test(k)) {
+      const from = open ? active + 1 : chosen + 1
+      const hit = [...options.slice(from), ...options.slice(0, from)].find((o) => o.label.toLowerCase().startsWith(k.toLowerCase()))
+      if (hit) {
+        const i = options.indexOf(hit)
+        if (open) setActive(i)
+        else onChange(hit.value)
+      }
+    }
+  }
+
+  return (
+    <>
+      <button
+        ref={button}
+        id={id}
+        type="button"
+        role="combobox"
+        aria-haspopup="listbox"
+        aria-expanded={open}
+        aria-controls={open ? listId : undefined}
+        aria-activedescendant={open ? `${listId}-${active}` : undefined}
+        aria-label={label}
+        onClick={() => (open ? setOpen(false) : show())}
+        onKeyDown={onKey}
+        className={`${control} ${SIZE[size]} press flex items-center justify-between gap-2 text-left font-medium ${open ? "border-accent ring-4 ring-accent/15" : "hover:bg-surface-2/60"} ${className}`}
+      >
+        <span className="truncate">{options[chosen]?.label}</span>
+        <CaretDown size={14} weight="bold" className={`shrink-0 text-ink-3 transition-transform ${open ? "rotate-180" : ""}`} aria-hidden />
+      </button>
+      {open &&
+        pos &&
+        createPortal(
+          <ul
+            ref={menu}
+            id={listId}
+            role="listbox"
+            aria-label={label}
+            tabIndex={-1}
+            className={`${menuPanel} sheet-in`}
+            style={{ left: pos.left, top: pos.top, bottom: pos.bottom, minWidth: Math.max(pos.width, 160) }}
+          >
+            {options.map((o, i) => {
+              const selected = i === chosen
+              return (
+                <li
+                  key={String(o.value)}
+                  id={`${listId}-${i}`}
+                  role="option"
+                  aria-selected={selected}
+                  onPointerEnter={() => setActive(i)}
+                  // Keep focus on the button so the keyboard keeps working.
+                  onPointerDown={(e) => e.preventDefault()}
+                  onClick={() => pick(i)}
+                  className={`flex cursor-pointer items-center justify-between gap-3 rounded-md px-2.5 py-2 text-sm text-ink ${i === active ? "bg-surface-2" : ""} ${selected ? "font-semibold" : "font-medium"}`}
+                >
+                  <span className="truncate">{o.label}</span>
+                  {selected && <Check size={16} weight="bold" className="shrink-0 text-accent" aria-hidden />}
+                </li>
+              )
+            })}
+          </ul>,
+          document.body,
+        )}
+    </>
+  )
+}
+
 /**
  * A time picker made of two number fields, hour (1–12) and minute (00–59), plus a quiet AM/PM
- * switch. `value` and `onChange` use 24-hour "HH:MM". ↑/↓ step a field; typing the hour moves on to
- * the minutes. Unlike the browser's time field, it never cuts off and reads the same everywhere.
+ * switch. `value` and `onChange` use 24-hour "HH:MM" ("" for no time). ↑/↓ step a field; typing the
+ * hour moves on to the minutes. `clearable` adds an ✕ that goes back to no time.
  */
-export function TimeField({ id, value, onChange, label = "Time" }: { id?: string; value: string; onChange: (v: string) => void; label?: string }) {
+export function TimeField({
+  id,
+  value,
+  onChange,
+  label = "Time",
+  size = "md",
+  clearable = false,
+  className = "",
+}: {
+  id?: string
+  value: string
+  onChange: (v: string) => void
+  label?: string
+  size?: ControlSize
+  clearable?: boolean
+  className?: string
+}) {
   const set = /^\d\d:\d\d$/.test(value)
   const h24 = set ? Number(value.slice(0, 2)) : 0
   const min = set ? Number(value.slice(3, 5)) : 0
@@ -21,11 +233,11 @@ export function TimeField({ id, value, onChange, label = "Time" }: { id?: string
 
   const emit = (h: number, m: number, isPm: boolean) => onChange(`${pad2((h % 12) + (isPm ? 12 : 0))}:${pad2(m)}`)
   const wrap = (n: number, lo: number, hi: number) => (n < lo ? hi : n > hi ? lo : n)
-  const step = (e: KeyboardEvent<HTMLInputElement>, field: "h" | "m") => {
+  const step = (e: KeyboardEvent<HTMLInputElement>, part: "h" | "m") => {
     if (e.key !== "ArrowUp" && e.key !== "ArrowDown") return
     e.preventDefault()
     const d = e.key === "ArrowUp" ? 1 : -1
-    if (field === "h") {
+    if (part === "h") {
       setHText(null)
       emit(wrap(h12 + d, 1, 12), min, pm)
     } else {
@@ -33,12 +245,13 @@ export function TimeField({ id, value, onChange, label = "Time" }: { id?: string
       emit(h12, wrap(min + d * (e.shiftKey ? 10 : 1), 0, 59), pm)
     }
   }
-  const field = "w-[2.2ch] bg-transparent text-center font-title text-lg font-semibold text-ink tabular-nums outline-none placeholder:text-ink-3"
+  const sm = size === "sm"
+  const digits = `w-[2.2ch] bg-transparent text-center font-semibold text-ink tabular-nums outline-none placeholder:text-ink-3 ${sm ? "text-sm" : "font-title text-lg"}`
   const half = (isPm: boolean) =>
-    `rounded-md px-1.5 py-0.5 text-[11px] font-semibold transition-colors ${pm === isPm && set ? "bg-surface text-ink-2 shadow-[0_1px_2px_rgb(0_0_0/0.08)]" : "text-ink-3"}`
+    `rounded-md px-1.5 py-0.5 text-[11px] font-semibold transition-colors ${pm === isPm && set ? "bg-surface text-ink-2 shadow-xs" : "text-ink-3"}`
 
   return (
-    <div role="group" aria-label={label} className="flex h-11 shrink-0 items-center gap-0.5 rounded-xl border border-line bg-bg pr-1 pl-2.5 focus-within:border-accent">
+    <div role="group" aria-label={label} className={`${control} flex shrink-0 items-center gap-0.5 pr-1 ${sm ? "h-9 pl-2" : "h-11 pl-3"} ${className}`}>
       <input
         id={id}
         inputMode="numeric"
@@ -57,9 +270,9 @@ export function TimeField({ id, value, onChange, label = "Time" }: { id?: string
           // "1" could still become 10–12; anything else is a whole hour, so go on to minutes.
           if (t.length === 2 || (t && n > 1)) minutes.current?.focus()
         }}
-        className={field}
+        className={digits}
       />
-      <span className="font-title text-lg font-semibold text-ink-3">:</span>
+      <span className={`font-semibold text-ink-3 ${sm ? "text-sm" : "font-title text-lg"}`}>:</span>
       <input
         ref={minutes}
         inputMode="numeric"
@@ -76,15 +289,22 @@ export function TimeField({ id, value, onChange, label = "Time" }: { id?: string
           const n = Number(t)
           if (t && n <= 59) emit(h12, n, pm)
         }}
-        className={field}
+        className={digits}
       />
-      <span className="ml-1.5 flex rounded-lg bg-surface-2 p-0.5">
-        <button type="button" aria-pressed={set && !pm} onClick={() => emit(h12, min, false)} className={half(false)}>
-          AM
-        </button>
-        <button type="button" aria-pressed={pm} onClick={() => emit(h12, min, true)} className={half(true)}>
-          PM
-        </button>
+      <span className="ml-auto flex shrink-0 items-center gap-0.5 pl-1.5">
+        <span className="flex rounded-md bg-surface-2 p-0.5">
+          <button type="button" aria-pressed={set && !pm} onClick={() => emit(h12, min, false)} className={half(false)}>
+            AM
+          </button>
+          <button type="button" aria-pressed={pm} onClick={() => emit(h12, min, true)} className={half(true)}>
+            PM
+          </button>
+        </span>
+        {clearable && set && (
+          <button type="button" onClick={() => onChange("")} aria-label="No time" title="No time" className="press grid size-6 place-items-center rounded-md text-ink-3 hover:bg-surface-2 hover:text-ink">
+            <X size={12} weight="bold" />
+          </button>
+        )}
       </span>
     </div>
   )

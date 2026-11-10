@@ -1,4 +1,4 @@
-import { Check, Pause, Play, Queue, SkipForward, Timer as TimerIcon, X } from "@phosphor-icons/react"
+import { Check, Pause, Play, Timer as TimerIcon, X } from "@phosphor-icons/react"
 import { useEffect, useRef, useState } from "react"
 import { BREAK_MINUTES, FOCUS_MINUTES } from "../config/groups"
 import type { DayKey } from "../lib/date"
@@ -307,11 +307,7 @@ export function MiniPlayer({
     setDraft(null)
   }
 
-  // ⏭: the next unfinished task in the group after the one playing (wrapping round).
   const group = task?.group
-  const items = group?.items ?? []
-  const at = group?.active ? items.findIndex((i) => i.kind === group.active!.kind && i.id === group.active!.id) : -1
-  const next = items.length ? [...items.slice(at + 1), ...items.slice(0, Math.max(0, at))].find((i) => !i.done) : undefined
 
   const where = !item ? "No task" : item.kind === "group" ? "Whole group" : item.group.label
   const sub2 = active && startedAt
@@ -323,12 +319,37 @@ export function MiniPlayer({
       : `${where} · ${mode === "focus" ? "Focus" : "Break"}`
   const small = "press grid size-8 shrink-0 place-items-center rounded-full text-ink-2 hover:bg-surface-2"
 
+  // Mark done and the small actions: in the one row from 640px up, in a second row on phones.
+  const doneBtn =
+    task && item ? (
+      <button
+        onClick={onToggleTask}
+        disabled={task.day > task.today}
+        aria-pressed={item.done}
+        className="press relative flex h-8 shrink-0 items-center gap-2 rounded-full px-2 text-[13px] text-ink-2 hover:bg-surface-2 disabled:opacity-35"
+      >
+        <span className={`grid size-[18px] place-items-center rounded-full border-[1.5px] ${item.done ? "hc-fill border-transparent text-white" : "border-ink-3"}`}>
+          {item.done && <Check size={10} weight="bold" className="pop" />}
+        </span>
+        {item.done ? "Done" : "Mark done"}
+      </button>
+    ) : (
+      <span className="px-2 text-[13px] text-ink-3">Tap a task to focus on it</span>
+    )
+  // The one action on the right: stop and close.
+  const actions = (
+    <button onClick={onClose} aria-label="Close mini player" title="Stop and close" className={small}>
+      <X size={15} weight="bold" />
+    </button>
+  )
+  const elapsedText = <span className="shrink-0 text-[11px] text-ink-3 tabular-nums">{active ? `${mmss(elapsed)} in` : ""}</span>
+
   return (
     <div
       role="region"
       aria-label="Now focusing"
       style={{ ...PLAYER_VARS, ["--hc" as string]: colorVar(item?.group.color ?? "slate") }}
-      className="fixed inset-x-3 bottom-[calc(76px+env(safe-area-inset-bottom))] z-40 mx-auto max-w-[460px] overflow-hidden rounded-[24px] bg-surface text-ink shadow-[0_16px_40px_-10px_rgb(0_0_0/0.45)] sm:bottom-5"
+      className="fixed inset-x-3 bottom-[calc(76px+env(safe-area-inset-bottom))] z-40 mx-auto max-w-[460px] overflow-hidden sm:max-w-[820px] rounded-[20px] bg-surface text-ink shadow-[0_16px_40px_-10px_rgb(0_0_0/0.45)] sm:bottom-5"
     >
       {task && group && queueOpen && (
         <>
@@ -337,18 +358,18 @@ export function MiniPlayer({
         </>
       )}
 
-      <div className="relative flex items-center gap-2.5 p-2 sm:gap-3 sm:p-2.5">
+      <div className="relative flex items-center gap-2.5 p-2 sm:gap-3 sm:px-2.5 sm:py-2">
         {/* Soft glow of the group's colour behind the artwork */}
         <div
           aria-hidden
           className="pointer-events-none absolute inset-y-0 left-0 w-44"
           style={{ background: "radial-gradient(circle at 18% 50%, color-mix(in oklab, var(--hc) 40%, transparent), transparent 70%)" }}
         />
-        <span className="relative grid size-12 shrink-0 place-items-center rounded-2xl hc-fill text-white sm:size-14" aria-hidden>
-          <Icon size={24} weight="fill" />
+        <span className="relative grid size-9 shrink-0 place-items-center rounded-lg hc-fill text-white sm:size-8" aria-hidden>
+          <Icon size={16} weight="fill" />
           {item?.done && (
-            <span className="absolute -right-1 -bottom-1 grid size-5 place-items-center rounded-full border-2 border-surface bg-white text-[#17191e]">
-              <Check size={10} weight="bold" />
+            <span className="absolute -right-1 -bottom-1 grid size-4 place-items-center rounded-full border-2 border-surface bg-white text-[#17191e]">
+              <Check size={8} weight="bold" />
             </span>
           )}
         </span>
@@ -358,26 +379,30 @@ export function MiniPlayer({
           title={group ? "Up Next" : undefined}
           className={`relative min-w-0 flex-1 text-left ${group ? "" : "cursor-default"}`}
         >
-          <p className={`truncate text-[15px] leading-5 font-semibold ${item?.done ? "text-ink-3 line-through" : ""}`}>{item?.name ?? "Quick focus"}</p>
-          <p className="truncate text-[13px] leading-5 text-ink-3">{sub2}</p>
+          <p className={`truncate text-[14px] leading-5 font-semibold ${item?.done ? "text-ink-3 line-through" : ""}`}>{item?.name ?? "Quick focus"}</p>
+          <p className="truncate text-[12px] leading-4 text-ink-3">{sub2}</p>
         </button>
+        <span className="hidden sm:contents">
+          {doneBtn}
+          {elapsedText}
+        </span>
 
         {active ? (
           <>
-            <span className="relative shrink-0 font-title text-[19px] font-semibold tabular-nums" aria-live="off">
+            <span className="relative shrink-0 font-title text-[17px] font-semibold tabular-nums" aria-live="off">
               {mmss(left[mode])}
             </span>
             <button
               onClick={() => toggle(mode)}
               aria-label={on ? `Pause ${mode} timer` : `Resume ${mode} timer`}
-              className="press relative grid size-11 shrink-0 place-items-center rounded-2xl bg-white text-[#17191e] sm:size-12"
+              className="press relative grid size-10 shrink-0 place-items-center rounded-xl bg-white text-[#17191e] sm:size-9"
             >
-              {on ? <Pause size={22} weight="fill" /> : <Play size={22} weight="fill" />}
+              {on ? <Pause size={18} weight="fill" /> : <Play size={18} weight="fill" />}
             </button>
           </>
         ) : (
           <>
-            <label className="relative flex h-11 shrink-0 items-center gap-0.5 rounded-2xl bg-surface-2 pr-2.5 pl-1.5 sm:h-12 sm:pr-3 sm:pl-2" title={`${mode === "focus" ? "Focus" : "Break"} length`}>
+            <label className="relative flex h-10 shrink-0 items-center gap-0.5 rounded-xl bg-surface-2 pr-2.5 pl-1.5 sm:h-9" title={`${mode === "focus" ? "Focus" : "Break"} length`}>
               <input
                 type="number"
                 inputMode="numeric"
@@ -390,7 +415,7 @@ export function MiniPlayer({
                   if (e.key === "Enter") (e.target as HTMLInputElement).blur()
                 }}
                 aria-label={`${mode === "focus" ? "Focus" : "Break"} minutes`}
-                className="w-9 [appearance:textfield] bg-transparent text-center font-title text-[18px] sm:w-10 sm:text-[19px] font-semibold text-ink tabular-nums outline-none [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+                className="w-9 [appearance:textfield] bg-transparent text-center font-title text-[17px] font-semibold text-ink tabular-nums outline-none [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
               />
               <span className="text-xs text-ink-3">min</span>
             </label>
@@ -403,54 +428,28 @@ export function MiniPlayer({
                 setDraft(null)
                 toggle(mode, ms)
               }}
-              className="press relative flex h-11 shrink-0 items-center gap-1.5 rounded-2xl bg-white px-3.5 text-[15px] font-semibold text-[#17191e] sm:h-12 sm:px-4"
+              className="press relative flex h-10 shrink-0 items-center gap-1.5 rounded-xl bg-white px-3.5 text-[14px] font-semibold text-[#17191e] sm:h-9"
             >
-              <Play size={16} weight="fill" /> {mode === "break" ? "Break" : "Start"}
+              <Play size={14} weight="fill" /> {mode === "break" ? "Break" : "Start"}
             </button>
           </>
         )}
+        {/* From 640px up the small actions end the row, after a thin divider. */}
+        <span className="hidden sm:contents">
+          <span className="relative mx-0.5 h-6 w-px shrink-0 bg-line" aria-hidden />
+          <span className="relative flex shrink-0 items-center gap-0.5">{actions}</span>
+        </span>
       </div>
 
-      {/* Progress, then the small actions */}
+      {/* Progress along the bottom edge */}
       <div className="h-[3px] bg-surface-2" aria-hidden>
         <div className="h-full hc-fill transition-[width] duration-300" style={{ width: `${progress * 100}%` }} />
       </div>
-      <div className="flex items-center gap-1 px-2 py-1">
-        {task && item ? (
-          <button
-            onClick={onToggleTask}
-            disabled={task.day > task.today}
-            aria-pressed={item.done}
-            className="press flex h-8 items-center gap-2 rounded-full px-2 text-[13px] text-ink-2 hover:bg-surface-2 disabled:opacity-35"
-          >
-            <span className={`grid size-[18px] place-items-center rounded-full border-[1.5px] ${item.done ? "hc-fill border-transparent text-white" : "border-ink-3"}`}>
-              {item.done && <Check size={10} weight="bold" className="pop" />}
-            </span>
-            {item.done ? "Done" : "Mark done"}
-          </button>
-        ) : (
-          <span className="px-2 text-[13px] text-ink-3">Tap a task to focus on it</span>
-        )}
-        <span className="ml-auto text-[11px] text-ink-3 tabular-nums">{active ? `${mmss(elapsed)} in` : ""}</span>
-        {group && (
-          <button onClick={() => next && sub.onPickSub(next)} disabled={!next} aria-label={next ? `Next: ${next.name}` : "No next task"} title={next ? `Next: ${next.name}` : "Nothing left in this group"} className={`${small} disabled:opacity-30`}>
-            <SkipForward size={17} weight="fill" />
-          </button>
-        )}
-        {group && (
-          <button
-            onClick={() => setQueueOpen((o) => !o)}
-            aria-expanded={queueOpen}
-            aria-label={queueOpen ? "Hide Up Next" : "Show Up Next"}
-            title="Up Next"
-            className={`${small} ${queueOpen ? "bg-surface-2 text-ink" : ""}`}
-          >
-            <Queue size={17} weight={queueOpen ? "fill" : "regular"} />
-          </button>
-        )}
-        <button onClick={onClose} aria-label="Close mini player" title="Stop and close" className={small}>
-          <X size={15} weight="bold" />
-        </button>
+      {/* Phones: mark done and the small actions in a second row. */}
+      <div className="flex items-center gap-1 px-2 py-1 sm:hidden">
+        {doneBtn}
+        <span className="ml-auto">{elapsedText}</span>
+        {actions}
       </div>
     </div>
   )

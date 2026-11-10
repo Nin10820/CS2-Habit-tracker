@@ -3,6 +3,7 @@ import { useRef, useState } from "react"
 import { defaultData, exportData, parseData, type Store } from "../lib/store"
 import type { ThemePref } from "../lib/theme"
 import type { AppData } from "../lib/types"
+import { btn } from "./ui"
 import { ConfirmSheet, Sheet } from "./Sheet"
 
 /** Theme and data (backup, restore, clear). Groups are made in the app and are part of this data. */
@@ -61,7 +62,7 @@ export function SettingsSheet({
     )
   }
 
-  const btn = "press flex h-11 items-center justify-center gap-2 rounded-2xl bg-surface-2 text-sm font-semibold disabled:opacity-40"
+  const action = `${btn.secondary} w-full text-sm`
 
   return (
     <Sheet title="Settings" onClose={onClose}>
@@ -104,10 +105,10 @@ export function SettingsSheet({
       <p className="mt-6 text-xs font-semibold text-ink-2">Your data</p>
       <p className="mt-1 text-sm text-ink-3">Saved in this browser on this device only. No account, nothing is sent anywhere.</p>
       <div className="mt-3 grid grid-cols-2 gap-2">
-        <button onClick={() => exportData(store.data)} className={btn}>
+        <button onClick={() => exportData(store.data)} className={action}>
           <DownloadSimple size={18} /> Export
         </button>
-        <button onClick={() => file.current?.click()} className={btn}>
+        <button onClick={() => file.current?.click()} className={action}>
           <UploadSimple size={18} /> Import
         </button>
       </div>

@@ -4,10 +4,12 @@ import { COLORS, ICONS, type IconName } from "../config/groups"
 import { newId } from "../lib/store"
 import { colorVar, type Group, type GroupTask } from "../lib/types"
 import { ConfirmSheet, Sheet } from "./Sheet"
+import { control, Select, TimeField, btn } from "./ui"
 
 const DURATIONS = [5, 10, 15, 20, 25, 30, 40, 45, 60, 90]
+const MINUTE_OPTIONS = [{ value: 0, label: "– min" }, ...DURATIONS.map((m) => ({ value: m, label: `${m} min` }))]
 
-const box = "rounded-xl border border-line bg-bg px-3 text-base text-ink outline-none placeholder:text-ink-3 focus:border-accent"
+const box = `${control} px-3 text-[15px]`
 const field = `h-11 w-full ${box}`
 const label = "block text-xs font-semibold text-ink-2"
 const iconBtn = "press grid size-8 shrink-0 place-items-center rounded-lg text-ink-3 disabled:opacity-25"
@@ -135,7 +137,7 @@ export function GroupSheet({
             <label className={label} htmlFor="g-time">
               Start time <span className="font-normal text-ink-3">(optional)</span>
             </label>
-            <input id="g-time" type="time" value={time} onChange={(e) => setTime(e.target.value)} className={`mt-2 ${field}`} />
+            <TimeField id="g-time" value={time} onChange={setTime} clearable className="mt-2" />
           </div>
         </div>
 
@@ -175,26 +177,21 @@ export function GroupSheet({
                   />
                 </div>
                 <div className="mt-1.5 flex flex-wrap items-center gap-1 pl-7">
-                  <select
-                    value={t.minutes ?? ""}
-                    onChange={(e) => setTask(i, { minutes: e.target.value ? Number(e.target.value) : undefined })}
-                    aria-label={`Minutes for task ${i + 1}`}
-                    className={`${box} h-8 w-[96px] !px-2 text-sm`}
-                  >
-                    <option value="">– min</option>
-                    {DURATIONS.map((m) => (
-                      <option key={m} value={m}>
-                        {m} min
-                      </option>
-                    ))}
-                  </select>
+                  <Select
+                    value={t.minutes ?? 0}
+                    onChange={(m) => setTask(i, { minutes: m || undefined })}
+                    label={`Minutes for task ${i + 1}`}
+                    size="sm"
+                    className="w-[104px]"
+                    options={MINUTE_OPTIONS}
+                  />
                   {standalone && (
-                    <input
-                      type="time"
+                    <TimeField
                       value={t.time ?? ""}
-                      onChange={(e) => setTask(i, { time: e.target.value || undefined })}
-                      aria-label={`Time for task ${i + 1}`}
-                      className={`${box} h-8 w-[104px] !px-2 text-sm`}
+                      onChange={(v) => setTask(i, { time: v || undefined })}
+                      label={`Time for task ${i + 1}`}
+                      size="sm"
+                      clearable
                     />
                   )}
                   <button
@@ -366,11 +363,11 @@ export function GroupSheet({
         </div>
 
         <div className="flex flex-col gap-2 pt-1 sm:flex-row-reverse">
-          <button type="submit" disabled={!name} className="press h-12 w-full rounded-2xl bg-accent font-semibold text-on-accent disabled:opacity-40 sm:flex-1">
+          <button type="submit" disabled={!name} className={`${btn.primary} w-full sm:flex-1`}>
             {group ? "Save group" : "Create group"}
           </button>
           {group && onDelete && (
-            <button type="button" onClick={() => setConfirmDelete(true)} className="press h-12 rounded-2xl px-5 font-semibold text-danger">
+            <button type="button" onClick={() => setConfirmDelete(true)} className={btn.dangerGhost}>
               Delete group
             </button>
           )}

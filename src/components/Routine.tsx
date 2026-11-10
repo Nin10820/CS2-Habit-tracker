@@ -4,9 +4,9 @@ import { formatLong, type DayKey } from "../lib/date"
 import { newId } from "../lib/store"
 import type { AppData, RoutineItem } from "../lib/types"
 import { Sheet } from "./Sheet"
-import { DashedEmpty, listRow, PillHeader, pillAction, TimeField } from "./ui"
+import { control, DashedEmpty, listRow, PillHeader, pillAction, TimeField, btn } from "./ui"
 
-const field = "h-11 w-full rounded-xl border border-line bg-bg px-3 text-base text-ink outline-none placeholder:text-ink-3 focus:border-accent"
+const field = `${control} h-11 w-full px-3 text-[15px]`
 export const RoutineIcon = ({ item, size = 18 }: { item: RoutineItem; size?: number }) =>
   !item.daily ? (
     <Clock size={size} className="shrink-0 text-ink-3" />
@@ -216,7 +216,7 @@ export function RoutineLogSheet({
         {future ? (
           <p className="mt-4 text-sm text-ink-3">You can log the time on the day itself.</p>
         ) : (
-          <button type="submit" className="press mt-5 h-12 w-full rounded-2xl bg-accent font-semibold text-on-accent">
+          <button type="submit" className={`${btn.primary} mt-5 w-full`}>
             {entries.some((e) => e.logged) ? "Save" : "Log"}
           </button>
         )}
@@ -227,7 +227,7 @@ export function RoutineLogSheet({
               onLater()
               onClose()
             }}
-            className="press mt-2 h-11 w-full rounded-2xl font-semibold text-ink-2"
+            className={`${btn.ghost} mt-2 w-full`}
           >
             Later
           </button>
@@ -239,7 +239,7 @@ export function RoutineLogSheet({
               onClear(entries[0])
               onClose()
             }}
-            className="press mt-2 h-11 w-full rounded-2xl font-semibold text-danger"
+            className={`${btn.dangerGhost} mt-2 w-full`}
           >
             Clear this time
           </button>
@@ -251,7 +251,7 @@ export function RoutineLogSheet({
               onRemove(entries[0])
               onClose()
             }}
-            className="press mt-2 h-11 w-full rounded-2xl font-semibold text-ink-2"
+            className={`${btn.ghost} mt-2 w-full`}
           >
             Remove from this day
           </button>
@@ -318,12 +318,7 @@ export function RoutineEditSheet({ items, onSave, onClose }: { items: RoutineIte
                 {x.daily && x.when === "evening" && (
                   <label className="flex items-center gap-1.5 text-xs text-ink-3">
                     Guess until you have logs
-                    <input
-                      type="time"
-                      value={x.usual ?? "23:00"}
-                      onChange={(e) => set(i, { usual: e.target.value || undefined })}
-                      className="h-8 rounded-lg border border-line bg-bg px-1.5 text-sm text-ink outline-none focus:border-accent"
-                    />
+                    <TimeField value={x.usual ?? "23:00"} onChange={(v) => set(i, { usual: v || undefined })} label="Usual bedtime" size="sm" />
                   </label>
                 )}
               </div>
@@ -337,7 +332,7 @@ export function RoutineEditSheet({ items, onSave, onClose }: { items: RoutineIte
         >
           <Plus size={16} weight="bold" /> Add a moment
         </button>
-        <button type="submit" className="press mt-4 h-12 w-full rounded-2xl bg-accent font-semibold text-on-accent">
+        <button type="submit" className={`${btn.primary} mt-4 w-full`}>
           Save routine
         </button>
       </form>

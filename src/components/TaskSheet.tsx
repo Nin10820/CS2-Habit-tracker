@@ -6,9 +6,11 @@ import { pickTasks, plansOn } from "../lib/plan"
 import type { TaskInput } from "../lib/store"
 import { colorVar, type AppData, type Group, type Task } from "../lib/types"
 import { ConfirmSheet, Sheet } from "./Sheet"
+import { field, Select, TimeField, btn } from "./ui"
 
 const DURATIONS = [10, 15, 20, 30, 45, 60, 90]
-const field = "mt-2 h-12 w-full rounded-2xl border border-line bg-bg px-4 text-base text-ink outline-none focus:border-accent"
+const DURATION_OPTIONS = [{ value: 0, label: "None" }, ...DURATIONS.map((m) => ({ value: m, label: `${m} min` }))]
+const fieldClass = `mt-2 ${field()}`
 const chip = (on: boolean) =>
   `press flex h-9 items-center gap-1.5 rounded-full border px-3 text-sm font-medium ${on ? "hc-soft border-transparent text-ink" : "border-line text-ink-2"}`
 
@@ -67,7 +69,7 @@ function TaskForm({ day, task, groups, onSave, onDone }: { day: DayKey; task?: T
         maxLength={60}
         placeholder="e.g. Reply to client email"
         autoComplete="off"
-        className={`${field} placeholder:text-ink-3`}
+        className={fieldClass}
       />
 
       <fieldset className="mt-4">
@@ -80,24 +82,17 @@ function TaskForm({ day, task, groups, onSave, onDone }: { day: DayKey; task?: T
           <label className="block text-xs font-semibold text-ink-2" htmlFor="task-time">
             Time <span className="font-normal text-ink-3">(optional)</span>
           </label>
-          <input id="task-time" type="time" value={time} onChange={(e) => setTime(e.target.value)} className={field} />
+          <TimeField id="task-time" value={time} onChange={setTime} clearable className="mt-2" />
         </div>
         <div>
           <label className="block text-xs font-semibold text-ink-2" htmlFor="task-min">
             Duration
           </label>
-          <select id="task-min" value={minutes ?? ""} onChange={(e) => setMinutes(e.target.value ? Number(e.target.value) : undefined)} className={field}>
-            <option value="">None</option>
-            {DURATIONS.map((m) => (
-              <option key={m} value={m}>
-                {m} min
-              </option>
-            ))}
-          </select>
+          <Select id="task-min" value={minutes ?? 0} onChange={(m) => setMinutes(m || undefined)} className="mt-2 w-full" options={DURATION_OPTIONS} />
         </div>
       </div>
 
-      <button type="submit" disabled={!trimmed} className="press mt-6 h-12 w-full rounded-2xl bg-accent font-semibold text-on-accent disabled:opacity-40">
+      <button type="submit" disabled={!trimmed} className={`${btn.primary} mt-6 w-full`}>
         {task ? "Save changes" : "Add task"}
       </button>
     </form>
@@ -136,7 +131,7 @@ function PlanForm({
       <div className="text-center">
         <p className="text-ink-2">You don't have any groups yet.</p>
         <p className="mt-1 text-sm text-ink-3">Make one with its tasks numbered 1 → n, then add it to your days.</p>
-        <button onClick={onNewGroup} className="press mt-5 inline-flex h-12 items-center gap-2 rounded-2xl bg-accent px-5 font-semibold text-on-accent">
+        <button onClick={onNewGroup} className={`${btn.primary} mt-5`}>
           <Plus size={18} weight="bold" /> New group
         </button>
       </div>
@@ -236,7 +231,7 @@ function PlanForm({
       <button
         type="submit"
         disabled={!g || planned || (repeat && !repeatDays.length)}
-        className="press mt-6 h-12 w-full rounded-2xl bg-accent font-semibold text-on-accent disabled:opacity-40"
+        className={`${btn.primary} mt-6 w-full`}
       >
         {repeat ? "Add and repeat" : "Add to this day"}
       </button>
@@ -322,7 +317,7 @@ export function TaskSheet({
   return (
     <Sheet title="Edit task" onClose={onClose}>
       <TaskForm day={task.day} task={task} groups={groups} onSave={onSave} onDone={onClose} />
-      <button type="button" onClick={() => setConfirmDelete(true)} className="press mt-2 h-11 w-full rounded-2xl font-semibold text-danger">
+      <button type="button" onClick={() => setConfirmDelete(true)} className={`${btn.dangerGhost} mt-2 w-full`}>
         Delete task
       </button>
     </Sheet>

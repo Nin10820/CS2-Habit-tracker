@@ -13,6 +13,7 @@ import {
   Code,
   FilmSlate,
   Heart,
+  ListChecks,
   MusicNotes,
   Star,
   SunHorizon,
@@ -42,6 +43,7 @@ export const ICONS = {
   code: Code,
   work: Briefcase,
   heart: Heart,
+  list: ListChecks,
 } satisfies Record<string, Icon>
 export type IconName = keyof typeof ICONS
 export const SINGLE_ICON: Icon = CheckCircle

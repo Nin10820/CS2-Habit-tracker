@@ -34,30 +34,30 @@ export function itemsForDay(data: AppData, day: DayKey): DayItem[] {
 export const singleKey = (i: DayItem) => `${i.kind}:${i.id}`
 export const groupKey = (groupId: string) => `group:${groupId}`
 
+/** Card key of the "Other" card: every stand-alone action and one-off task of the day, together. */
+export const OTHER_KEY = "group:other"
+
 /**
- * The day as cards: one per group (its habits and one-off tasks inside), and one per standalone
- * item. Sorted by time, using the day's changed time where there is one.
+ * The day as cards: "Other" first (your stand-alone list and one-off tasks in no group, as one
+ * card), then one card per group, in time order or the order you dragged them into.
  */
 export function blocksForDay(data: AppData, day: DayKey): DayBlock[] {
   const items = itemsForDay(data, day)
   const changed = data.times[day] ?? {}
   const blocks: DayBlock[] = []
   for (const g of groupDefs(data).values()) {
+    if (g.standalone) continue
     const mine = items.filter((i) => i.group.id === g.id)
     // A planned group with an empty list still gets its card, so you can see it and fill it in.
-    if (!mine.length && (g.standalone || !plansOn(data, g.id, day).length)) continue
-    if (g.standalone) {
-      for (const item of mine) {
-        const key = singleKey(item)
-        blocks.push({ kind: "single", key, item, expected: item.time, time: changed[key] ?? item.time })
-      }
-    } else {
-      const key = groupKey(g.id)
-      blocks.push({ kind: "group", key, group: g, items: mine, expected: g.time, time: changed[key] ?? g.time })
-    }
+    if (!mine.length && !plansOn(data, g.id, day).length) continue
+    const key = groupKey(g.id)
+    blocks.push({ kind: "group", key, group: g, items: mine, expected: g.time, time: changed[key] ?? g.time })
   }
   const byTime = blocks.sort((a, b) => (a.time ?? "99:99").localeCompare(b.time ?? "99:99"))
-  return applyOrder(byTime, data.order?.[day])
+  const others = items.filter((i) => i.group.standalone)
+  const otherDef = [...groupDefs(data).values()].find((g) => g.standalone && g.id !== "")
+  const other: DayBlock[] = others.length && otherDef ? [{ kind: "group", key: OTHER_KEY, group: otherDef, items: others }] : []
+  return [...other, ...applyOrder(byTime, data.order?.[day])]
 }
 
 /**

@@ -1,30 +1,29 @@
-import { CalendarBlank, CaretDown, CaretLeft, CaretRight, Clock } from "@phosphor-icons/react"
+import { CalendarBlank, CaretLeft, CaretRight, Clock } from "@phosphor-icons/react"
 import { useEffect, useRef, useState, type ReactNode } from "react"
 import { useClock } from "../lib/clock"
 import { dragScroll } from "../lib/dragScroll"
-import { addDays, addMonths, dayOfMonth, formatDow, formatLong, formatMonthYear, formatWeekMonths, isoWeek, range, startOfWeek, weekOf, type DayKey } from "../lib/date"
+import { addDays, dayOfMonth, formatDow, formatLong, formatWeekMonths, isoWeek, range, startOfWeek, weekOf, type DayKey } from "../lib/date"
 import { routineOn } from "../lib/routine"
 import { blocksForDay, itemsForDay } from "../lib/stats"
 import type { AppData, DayItem, RoutineItem } from "../lib/types"
-import { MonthGrid, WeekGrid, type OpenBlock } from "./CalendarViews"
+import { Agenda } from "./Agenda"
 import { DayColumn, DayHead, TODAY_BG, type CardDrag } from "./DayColumn"
 import { WeekSummary } from "./WeekSummary"
-import { Ring } from "./ui"
+import { Ring, Select } from "./ui"
 
-type View = "days" | "week" | "month"
+type View = "days" | "agenda"
 const VIEWS: [View, string][] = [
-  ["days", "7 days"],
-  ["week", "Week"],
-  ["month", "Month"],
+  ["days", "Week"],
+  ["agenda", "Agenda"],
 ]
 
-/** 7 days from yesterday (the default), Week or Month (from 768px), remembered in this browser. */
+/** Week (day columns, the default) or Agenda (days × groups), from 768px, remembered in this browser. */
 function useView() {
   const KEY = "habit-tracker:view-v2"
   const [view, setView] = useState<View>(() => {
     try {
       const v = localStorage.getItem(KEY)
-      return v === "week" || v === "month" ? v : "days"
+      return v === "agenda" ? v : "days"
     } catch {
       return "days"
     }
@@ -111,23 +110,15 @@ export function WeekBoard({
     setPicked(today)
     setScrollKey((k) => k + 1)
   }
-  // Arrows move 7 days, a week or a month. On phones (week strip) they always move a week.
+  // Arrows move a week (the 7 days shown, or the phone's week strip).
   const shift = (n: number) => {
-    const phone = !window.matchMedia("(min-width: 768px)").matches
-    const next = phone || view === "week" ? addDays(anchor, n * 7) : view === "month" ? addMonths(anchor, n) : addDays(anchor, n * DAY_COUNT)
+    const next = addDays(anchor, n * DAY_COUNT)
     setAnchor(next)
     const week = weekOf(next)
     setPicked(week.includes(today) ? today : week[0])
   }
-  // A day picked in Week or Month opens the card days around it.
-  const openDay = (d: DayKey) => {
-    setAnchor(d)
-    setPicked(d)
-    setView("days")
-  }
-  const openBlock: OpenBlock = (b, d) => (b.kind === "group" ? onFocusGroup(b.group.id, d) : onFocus(b.item, d))
-  const unit = view === "month" ? "month" : view === "week" ? "week" : "7 days"
-  const title = view === "month" ? formatMonthYear(anchor) : view === "week" ? formatWeekMonths(weekStart) : formatWeekMonths(cardDays[0], DAY_COUNT)
+  const unit = "week"
+  const title = formatWeekMonths(cardDays[0], DAY_COUNT)
   const routineFor = (d: DayKey) => routineOn(data, d).map((item) => ({ item, time: data.routine.log[item.id]?.[d] }))
 
   const btn = "press flex h-10 items-center gap-1.5 rounded-xl px-3 text-sm font-semibold"
@@ -152,26 +143,12 @@ export function WeekBoard({
             <span className="md:hidden">{formatWeekMonths(weekStart)}</span>
             <span className="hidden md:inline">{title}</span>
           </h1>
-          {view !== "month" && (
-            <span className="shrink-0 text-xs font-semibold tracking-wider whitespace-nowrap text-ink-2 uppercase sm:text-sm xl:@max-5xl:hidden">
-              Week {isoWeek(view === "days" ? anchor : day)}
-            </span>
-          )}
+          <span className="shrink-0 text-xs font-semibold tracking-wider whitespace-nowrap text-ink-2 uppercase sm:text-sm xl:@max-5xl:hidden">
+            Week {isoWeek(anchor)}
+          </span>
         </div>
-        <div className="relative hidden shrink-0 md:block xl:@max-2xl:hidden">
-          <select
-            value={view}
-            onChange={(e) => setView(e.target.value as View)}
-            aria-label="View"
-            className="press h-10 appearance-none rounded-full border border-line bg-surface pr-9 pl-4 text-sm font-semibold text-ink outline-none focus-visible:border-accent"
-          >
-            {VIEWS.map(([v, label]) => (
-              <option key={v} value={v}>
-                {label}
-              </option>
-            ))}
-          </select>
-          <CaretDown size={12} weight="bold" className="pointer-events-none absolute top-1/2 right-4 -translate-y-1/2 text-ink-2" />
+        <div className="hidden shrink-0 md:block xl:@max-2xl:hidden">
+          <Select value={view} onChange={setView} label="View" size="sm" className="!h-10 w-[128px]" options={VIEWS.map(([value, label]) => ({ value, label }))} />
         </div>
         <div className="flex w-full items-center justify-end gap-2 md:ml-auto md:w-auto xl:shrink-0">
           <button onClick={goToday} aria-label="Today" title="Today" className={`${btn} bg-accent-soft text-accent`}>
@@ -179,8 +156,8 @@ export function WeekBoard({
           </button>
           <div
             aria-label={`Current time ${clock}`}
-            // In the 7-day view (768px+) the clock lives in the week summary instead.
-            className={`flex h-10 items-center gap-1.5 rounded-xl border border-line bg-surface px-3 text-sm font-semibold text-ink tabular-nums xl:@max-4xl:hidden ${view === "days" ? "md:hidden" : ""}`}
+            // From 768px the clock lives in the week summary instead.
+            className="flex h-10 items-center gap-1.5 rounded-xl border border-line bg-surface px-3 text-sm font-semibold text-ink tabular-nums md:hidden"
           >
             <Clock size={18} className="text-ink-2" /> {clock}
           </div>
@@ -221,7 +198,8 @@ export function WeekBoard({
         </div>
         <DayColumn
           className="mt-4"
-          showHeader={false}          day={day}
+          showHeader={false}
+          day={day}
           today={today}
           blocks={blocksForDay(data, day)}
           onToggle={(i) => onToggle(i, day)}
@@ -240,21 +218,19 @@ export function WeekBoard({
         />
       </div>
 
-      {/* 768px+: 7 day columns of cards (scrolling sideways), or the Week / Month calendar */}
+      {/* 768px+: the week summary (stays put, set apart by a line), then the Week columns or the Agenda. */}
+      <div className="mt-5 hidden md:block xl:mt-0">
+        <WeekSummary data={data} today={today} anchor={anchor} clock={clock} />
+      </div>
       {view === "days" ? (
         <>
-        {/* One top section: the week summary (stays put), then the day heads band (scrolls sideways with the columns). */}
-        {/* Set apart from the day heads below by a line. */}
-        <div className="mt-5 hidden md:block xl:mt-0">
-          <WeekSummary data={data} today={today} anchor={anchor} clock={clock} />
-        </div>
         <div
           ref={scroller}
           {...dragScroll()}
           className="hidden cursor-grab snap-x scroll-px-4 overflow-x-auto pb-3 md:block xl:min-h-0 xl:flex-1 xl:overflow-auto xl:pb-0"
         >
-          {/* One width for both rows (at least 296px a day), so each head sits right above its column. */}
-          <div className="flex min-h-full flex-col" style={{ width: `max(100%, ${cardDays.length * 296 + (cardDays.length - 1) * 24 + 32}px)` }}>
+          {/* One width for both rows (at least 328px a day), so each head sits right above its column. */}
+          <div className="flex min-h-full flex-col" style={{ width: `max(100%, ${cardDays.length * 328 + (cardDays.length - 1) * 24 + 32}px)` }}>
           {/* All the day heads as one band, pinned while the cards scroll: date, done count, routine. */}
           <div className="z-20 flex gap-6 border-b border-line bg-surface px-4 shadow-[0_6px_12px_-10px_rgb(0_0_0/0.25)] xl:sticky xl:top-0">
             {cardDays.map((k) => (
@@ -274,7 +250,8 @@ export function WeekBoard({
               head={false}
               // Columns are as tall as the tallest (or the board) and hold the space kept clear for
               // the player, so today's tint runs to the very bottom.
-              className="min-w-0 flex-1 basis-0 snap-start xl:pb-[calc(var(--player-space)+16px)]"              day={k}
+              className="min-w-0 flex-1 basis-0 snap-start xl:pb-[calc(var(--player-space)+16px)]"
+              day={k}
               today={today}
               blocks={blocksForDay(data, k)}
               onToggle={(i) => onToggle(i, k)}
@@ -297,12 +274,8 @@ export function WeekBoard({
         </div>
         </>
       ) : (
-        <div className="mt-5 hidden overflow-x-auto md:flex xl:mt-0 xl:min-h-0 xl:flex-1">
-          {view === "week" ? (
-            <WeekGrid days={days} today={today} now={clock} data={data} onOpen={openBlock} onPickDay={openDay} />
-          ) : (
-            <MonthGrid month={anchor} today={today} data={data} onPickDay={openDay} />
-          )}
+        <div className="hidden md:flex md:flex-col xl:min-h-0 xl:flex-1">
+          <Agenda data={data} days={cardDays} today={today} onToggle={onToggle} onFocus={onFocus} focusKey={focusKey} />
         </div>
       )}
     </div>
